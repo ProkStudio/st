@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Bambusito228</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <div id="app">
+    <section id="login-screen" class="screen">
+      <div class="login-card">
+        <div class="brand">
+          <img src="/assets/logo-bambusito.svg" alt="Bambusito228">
+          <h1>Admin Panel</h1>
+          <p>Управление обменником</p>
+        </div>
+        <form id="login-form">
+          <label>Логин<input type="text" name="username" value="admin" autocomplete="username" required></label>
+          <label>Пароль<input type="password" name="password" autocomplete="current-password" required></label>
+          <button type="submit" class="btn-primary">Войти</button>
+          <p class="error" id="login-error"></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="dashboard-screen" class="screen hidden">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <img src="/assets/logo-bambusito.svg" alt="">
+          <span>Admin</span>
+        </div>
+        <nav>
+          <button class="nav-item active" data-tab="overview"><i data-lucide="layout-dashboard"></i> Обзор</button>
+          <button class="nav-item" data-tab="orders"><i data-lucide="list-ordered"></i> Ордера</button>
+          <button class="nav-item" data-tab="chat"><i data-lucide="message-circle"></i> Чат <span class="nav-badge hidden" id="chat-badge">0</span></button>
+          <button class="nav-item" data-tab="settings"><i data-lucide="settings"></i> Настройки</button>
+        </nav>
+        <button class="logout" id="logout-btn"><i data-lucide="log-out"></i> Выйти</button>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <h2 id="page-title">Обзор</h2>
+          <div class="topbar-actions">
+            <span class="live-dot"></span>
+            <span class="live-label">Live</span>
+            <a href="/" class="btn-ghost" target="_blank" rel="noopener noreferrer">Сайт ↗</a>
+          </div>
+        </header>
+
+        <div id="tab-overview" class="tab active">
+          <div class="stats-grid">
+            <article class="stat-card">
+              <span class="stat-label">Всего ордеров</span>
+              <strong id="stat-total">0</strong>
+            </article>
+            <article class="stat-card accent-orange">
+              <span class="stat-label">Ожидают</span>
+              <strong id="stat-pending">0</strong>
+            </article>
+            <article class="stat-card accent-green">
+              <span class="stat-label">Выполнено</span>
+              <strong id="stat-completed">0</strong>
+            </article>
+            <article class="stat-card accent-blue">
+              <span class="stat-label">Наценка</span>
+              <strong id="stat-fee">0%</strong>
+            </article>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>Последние ордера</h3></div>
+            <div id="recent-orders" class="orders-list"></div>
+          </div>
+        </div>
+
+        <div id="tab-orders" class="tab">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Все ордера</h3>
+              <button class="btn-ghost" id="refresh-orders">Обновить</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Направление</th>
+                    <th>Сумма</th>
+                    <th>Адрес</th>
+                    <th>Статус</th>
+                    <th>Дата</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="orders-table"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-chat" class="tab">
+          <div class="chat-layout">
+            <div class="panel chat-sessions-panel">
+              <div class="panel-head">
+                <h3>Диалоги</h3>
+                <button class="btn-ghost" id="refresh-chat">Обновить</button>
+              </div>
+              <div id="chat-sessions-list" class="chat-sessions-list"></div>
+            </div>
+            <div class="panel chat-thread-panel">
+              <div id="chat-thread-empty" class="chat-empty">Выберите диалог слева</div>
+              <div id="chat-thread" class="hidden">
+                <div class="chat-thread-head" id="chat-thread-meta"></div>
+                <div class="chat-thread-messages" id="chat-messages"></div>
+                <form class="chat-reply-form" id="chat-reply-form">
+                  <input type="text" id="chat-reply-input" placeholder="Ответить посетителю..." maxlength="2000" autocomplete="off">
+                  <button type="submit" class="btn-send" title="Отправить"><i data-lucide="send"></i></button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-settings" class="tab">
+          <div class="settings-stack">
+            <section class="panel settings-section">
+              <h3><i data-lucide="wallet"></i> Кошелёк для приёма оплаты</h3>
+              <p class="muted">Один адрес для всех ордеров. Показывается на странице заказа и в QR.</p>
+              <label class="field-block">
+                Адрес кошелька
+                <input type="text" id="deposit-wallet-input" placeholder="bc1q... / T... / rXRP...">
+              </label>
+            </section>
+
+            <section class="panel settings-section">
+              <h3><i data-lucide="percent"></i> Наценка от курса Bybit</h3>
+              <p class="muted">2 = клиент получает на 2% меньше. -5 = на 5% больше рыночного.</p>
+              <label class="field-block inline-field">
+                Наценка, %
+                <input type="number" id="markup-input" step="0.01" value="1.5">
+              </label>
+            </section>
+
+            <section class="panel settings-section">
+              <h3><i data-lucide="banknote"></i> Курс USD / RUB</h3>
+              <p class="muted">Для направлений с наличными</p>
+              <label class="field-block inline-field">
+                1 USD =
+                <input type="number" id="usd-rub-input" min="1" step="0.01" value="92.5">
+                RUB
+              </label>
+            </section>
+
+            <section class="panel settings-section">
+              <h3><i data-lucide="clock"></i> Время жизни ордера</h3>
+              <p class="muted">Таймер на странице заказа</p>
+              <label class="field-block inline-field">
+                <input type="number" id="order-ttl-input" min="5" max="180" value="30">
+                минут
+              </label>
+            </section>
+
+            <section class="panel settings-section">
+              <h3><i data-lucide="message-square"></i> Чат на сайте</h3>
+              <label class="field-block">
+                Имя оператора в шапке чата
+                <input type="text" id="chat-operator-input" value="Bambusito228 Support">
+              </label>
+            </section>
+
+            <section class="panel settings-section">
+              <h3><i data-lucide="key-round"></i> Смена пароля</h3>
+              <label class="field-block">Текущий пароль<input type="password" id="pwd-current"></label>
+              <label class="field-block">Новый пароль<input type="password" id="pwd-new"></label>
+            </section>
+
+            <div class="settings-actions">
+              <button class="btn-primary btn-lg" id="save-all-settings">Сохранить все настройки</button>
+              <p class="toast" id="settings-toast"></p>
+            </div>
+          </div>
+        </div>
+      </main>
+    </section>
+  </div>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="/admin/admin.js"></script>
+</body>
+</html>

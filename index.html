@@ -1,0 +1,376 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bambusito228 — обмен криптовалют</title>
+  <meta name="description" content="Быстрый и безопасный обмен криптовалют. Наличные USD/RUB в Казани.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/bambusito.css">
+  <link rel="stylesheet" href="/assets/css/svg_min14d2.css">
+  <link rel="icon" href="/assets/logo-bambusito.svg" type="image/svg+xml">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a href="/" class="logo-link">
+        <img src="/assets/logo-bambusito.svg" alt="Bambusito228">
+        <span>ambusito228</span>
+      </a>
+      <button type="button" class="nav-toggle" id="nav_toggle" aria-expanded="false" aria-label="Меню">
+        <i data-lucide="menu"></i>
+      </button>
+      <nav class="site-nav" id="site_nav">
+        <a href="#exchange">Обмен</a>
+        <a href="#advantages">Преимущества</a>
+        <a href="#recent">Сделки</a>
+        <a href="#news">Новости</a>
+        <a href="#faq_wrapper">FAQ</a>
+        <a href="#about">О сервисе</a>
+        <a href="#support">Поддержка</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" id="exchange">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <h1>Обмен криптовалют <em>без лишних шагов</em></h1>
+          <p>Мгновенный расчёт курса, прозрачная комиссия и поддержка в Telegram. Наличные USD и RUB — в офисе в Казани.</p>
+          <div class="hero-badges">
+            <span class="badge"><i data-lucide="zap"></i> Быстрый обмен</span>
+            <span class="badge"><i data-lucide="shield-check"></i> Некастодиальный</span>
+            <span class="badge"><i data-lucide="map-pin"></i> Казань, ул. Зинина 30</span>
+          </div>
+        </div>
+
+        <div class="exchange-card">
+          <h2>Начать обмен</h2>
+          <div class="exchange-row">
+            <span class="row-title">Отдаёте</span>
+            <div class="exchange-row-body">
+              <div class="coin-picker" id="picker_from" data-target="select_currency_from"></div>
+              <select id="select_currency_from" class="visually-hidden" aria-label="Валюта отдаёте" tabindex="-1"></select>
+              <div class="amount-wrap">
+                <label for="select_amount_from" class="amount-label">Сумма</label>
+                <input type="text" id="select_amount_from" class="amount-input" inputmode="decimal" autocomplete="off" value="0.01" placeholder="0.00" aria-label="Сумма">
+              </div>
+            </div>
+          </div>
+
+          <div class="swap-wrap">
+            <button type="button" class="swap-btn" id="swap_currencies" aria-label="Поменять валюты">
+              <i data-lucide="arrow-down-up"></i>
+            </button>
+          </div>
+
+          <div class="exchange-row">
+            <span class="row-title">Получаете</span>
+            <div class="exchange-row-body">
+              <div class="coin-picker" id="picker_to" data-target="select_currency_to"></div>
+              <select id="select_currency_to" class="visually-hidden" aria-label="Валюта получаете" tabindex="-1"></select>
+              <div class="amount-wrap amount-wrap--readonly">
+                <label for="select_amount_to" class="amount-label">Получите</label>
+                <input type="text" id="select_amount_to" class="amount-input" disabled placeholder="0.00" aria-label="Сумма к получению">
+              </div>
+            </div>
+          </div>
+
+          <p class="rate-line" id="rate_line">—</p>
+          <p class="rate-hint" id="rate_hint"></p>
+
+          <div id="wallet_block" class="wallet-block">
+            <label for="receive_wallet">Адрес кошелька получателя</label>
+            <textarea id="receive_wallet" placeholder="Вставьте адрес для зачисления" rows="2"></textarea>
+          </div>
+
+          <div id="cash_block" class="cash-notice" hidden>
+            В целях безопасности наличный обмен USD/RUB производится только в офисе:
+            <strong>ул. Зинина 30, Казань</strong>.
+            <a href="https://yandex.ru/maps/-/CHvXAONX" target="_blank" rel="noopener noreferrer">Открыть на Яндекс Картах</a>
+          </div>
+
+          <button type="button" class="btn-primary" id="exchange_submit">
+            <span>Начать обмен</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="advantages">
+      <div class="wrap">
+        <h2 class="section-title">Почему Bambusito228</h2>
+        <p class="section-sub">Сервис для тех, кому важны скорость, честный курс и понятный процесс</p>
+        <div class="advantages-grid">
+          <article class="adv-card">
+            <div class="ico-wrap"><i data-lucide="timer"></i></div>
+            <h3>Экономьте время</h3>
+            <p>Максимальная скорость обмена благодаря полной автоматизации заявок.</p>
+          </article>
+          <article class="adv-card">
+            <div class="ico-wrap"><i data-lucide="repeat"></i></div>
+            <h3>Простой обмен</h3>
+            <p>Выберите пару, укажите сумму и адрес — остальное займёт пару минут.</p>
+          </article>
+          <article class="adv-card">
+            <div class="ico-wrap"><i data-lucide="trending-down"></i></div>
+            <h3>Выгодный курс</h3>
+            <p>Лучшие рыночные котировки и минимальная прозрачная наценка сервиса.</p>
+          </article>
+          <article class="adv-card">
+            <div class="ico-wrap"><i data-lucide="wallet"></i></div>
+            <h3>Ваши ключи — ваши монеты</h3>
+            <p>Некастодиальный обмен: средства поступают напрямую на ваш кошелёк.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="recent">
+      <div class="wrap">
+        <h2 class="section-title">Последние обмены</h2>
+        <p class="section-sub">Актуальная активность на платформе в реальном времени</p>
+        <ul class="recent-list" id="recent_list"></ul>
+      </div>
+    </section>
+
+    <section class="section" id="faq_wrapper">
+      <div class="wrap">
+        <h2 class="section-title">Частые вопросы</h2>
+        <p class="section-sub">Ответы на популярные вопросы о сервисе</p>
+        <div class="faq-list">
+          <div class="faq-item">
+            <button type="button" class="faq-q">
+              <span>Как отследить свой заказ?</span>
+              <i data-lucide="chevron-down"></i>
+            </button>
+            <div class="faq-a"><div class="faq-inner">
+              <p>После создания заявки вы попадаете на страницу ордера с таймером и адресом для оплаты. Сохраните ссылку или ID ордера — по ним можно вернуться к статусу в любой момент.</p>
+            </div></div>
+          </div>
+          <div class="faq-item">
+            <button type="button" class="faq-q">
+              <span>Почему нам можно доверять?</span>
+              <i data-lucide="chevron-down"></i>
+            </button>
+            <div class="faq-a"><div class="faq-inner">
+              <p>Наличный обмен можно совершить в нашем пункте: ул. Зинина 30, г. Казань. <a href="https://yandex.ru/maps/-/CHv2QV8a" target="_blank" rel="noopener noreferrer">На Яндекс Картах</a>. Онлайн-обмен — без хранения ваших средств на нашей стороне.</p>
+            </div></div>
+          </div>
+          <div class="faq-item">
+            <button type="button" class="faq-q">
+              <span>Есть ли скрытые комиссии?</span>
+              <i data-lucide="chevron-down"></i>
+            </button>
+            <div class="faq-a"><div class="faq-inner">
+              <p>Нет. Сумма к получению показывается до подтверждения обмена. Наценка сервиса уже учтена в курсе — никаких дополнительных списаний.</p>
+            </div></div>
+          </div>
+          <div class="faq-item">
+            <button type="button" class="faq-q">
+              <span>Сколько ждать зачисление?</span>
+              <i data-lucide="chevron-down"></i>
+            </button>
+            <div class="faq-a"><div class="faq-inner">
+              <p>После подтверждения перевода обработка обычно занимает до 30 минут в зависимости от загрузки сети и выбранной пары.</p>
+            </div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="news">
+      <div class="wrap">
+        <h2 class="section-title">Новости крипторынка</h2>
+        <p class="section-sub">Актуальные заголовки — июнь 2026</p>
+        <div class="carousel" data-carousel>
+          <div class="carousel-track">
+            <a class="carousel-card carousel-card-link" href="https://thedefiant.io/news/markets/bitcoin-tops-usd67-000-to-two-week-high-after-trump-declares-us-iran-deal-complete-and-hormuz" target="_blank" rel="noopener noreferrer">
+              <div class="thumb" style="background-image:url('media/thumbs/blog/currencies/1.jpg')"></div>
+              <div class="body">
+                <h3>Bitcoin выше $67 000 после заявления Трампа о сделке с Ираном</h3>
+                <p>BTC вырос почти на 5% за сутки: рынок отреагировал на сообщение об открытии Ормузского пролива. Ликвидировано около $150 млн шортов.</p>
+                <time datetime="2026-06-15">15 июня 2026 · The Defiant</time>
+              </div>
+            </a>
+            <a class="carousel-card carousel-card-link" href="https://en.cryptonomist.ch/2026/06/15/bitcoin-price-rally-strait-hormuz/" target="_blank" rel="noopener noreferrer">
+              <div class="thumb" style="background-image:url('media/thumbs/blog/news/2.jpg')"></div>
+              <div class="body">
+                <h3>BTC до $66 829: ликвидировано $168 млн шортов за день</h3>
+                <p>Рост на фоне геополитики и притока $85,9 млн в спотовые Bitcoin-ETF. Strategy купила ещё 1 587 BTC.</p>
+                <time datetime="2026-06-15">15 июня 2026 · Cryptonomist</time>
+              </div>
+            </a>
+            <a class="carousel-card carousel-card-link" href="https://www.fxstreet.com/cryptocurrencies/news/crypto-today-bitcoin-ethereum-xrp-face-downside-pressure-amid-investor-de-risking-202606101200" target="_blank" rel="noopener noreferrer">
+              <div class="thumb" style="background-image:url('media/thumbs/blog/news/3.jpg')"></div>
+              <div class="body">
+                <h3>Bitcoin, Ethereum и XRP под давлением продавцов</h3>
+                <p>BTC снова к $61 000 после отказа от $64 000. Индекс страха и жадности — 9 («экстремальный страх»), из ETF вышло $77 млн.</p>
+                <time datetime="2026-06-10">10 июня 2026 · FXStreet</time>
+              </div>
+            </a>
+            <a class="carousel-card carousel-card-link" href="https://www.coingabbar.com/en/price-prediction/ethereum-price-prediction-ethereums-most-uncomfortable-year" target="_blank" rel="noopener noreferrer">
+              <div class="thumb" style="background-image:url('media/thumbs/blog/news/4.jpg')"></div>
+              <div class="body">
+                <h3>Ethereum около $1 719: институты покупают на просадке</h3>
+                <p>ETH потерял ~43% с начала года, но спотовые ETF 8 июня впервые за 17 дней показали приток $82 млн.</p>
+                <time datetime="2026-06-15">15 июня 2026 · CoinGabbar</time>
+              </div>
+            </a>
+            <a class="carousel-card carousel-card-link" href="https://thedefiant.io/news/markets/bitcoin-tops-usd67-000-to-two-week-high-after-trump-declares-us-iran-deal-complete-and-hormuz" target="_blank" rel="noopener noreferrer">
+              <div class="thumb" style="background-image:url('media/thumbs/blog/v2/stablecoins_w768.jpg')"></div>
+              <div class="body">
+                <h3>От $60 000 к $67 000: разворот Bitcoin за две недели</h3>
+                <p>5 июня BTC обновил минимум с октября 2024 года. К середине месяца — отскок на деэскалации на Ближнем Востоке.</p>
+                <time datetime="2026-06-11">11 июня 2026 · The Defiant</time>
+              </div>
+            </a>
+          </div>
+          <div class="carousel-nav">
+            <button type="button" data-carousel-prev aria-label="Назад"><i data-lucide="chevron-left"></i></button>
+            <button type="button" data-carousel-next aria-label="Вперёд"><i data-lucide="chevron-right"></i></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="guides">
+      <div class="wrap">
+        <h2 class="section-title">Гайды и инструкции</h2>
+        <p class="section-sub">Полезные материалы для безопасной работы с криптовалютой</p>
+        <div class="carousel" data-carousel>
+          <div class="carousel-track">
+            <article class="carousel-card">
+              <div class="thumb" style="background-image:url('media/thumbs/blog/v2/crypto_wallets_w768.jpg')"></div>
+              <div class="body">
+                <h3>Типы криптовалютных кошельков</h3>
+                <p>Горячие, холодные и аппаратные кошельки — как выбрать подходящий вариант хранения.</p>
+                <time datetime="2026-05-15">15 мая 2026</time>
+              </div>
+            </article>
+            <article class="carousel-card">
+              <div class="thumb" style="background-image:url('media/thumbs/blog/v2/how-to-exchange_w768.jpg')"></div>
+              <div class="body">
+                <h3>Как обменять криптовалюту на Bambusito228</h3>
+                <p>Пошаговая инструкция: от выбора пары до подтверждения перевода.</p>
+                <time datetime="2026-05-20">20 мая 2026</time>
+              </div>
+            </article>
+            <article class="carousel-card">
+              <div class="thumb" style="background-image:url('media/thumbs/blog/v2/avoidscam_w768.jpg')"></div>
+              <div class="body">
+                <h3>Как избежать мошенничества</h3>
+                <p>Типичные схемы обмана и простые правила защиты ваших средств.</p>
+                <time datetime="2026-05-22">22 мая 2026</time>
+              </div>
+            </article>
+            <article class="carousel-card">
+              <div class="thumb" style="background-image:url('media/thumbs/blog/v2/recover_tokens_w768.jpg')"></div>
+              <div class="body">
+                <h3>Отправили токены не в ту сеть?</h3>
+                <p>Почему важно выбирать правильный блокчейн и что делать при ошибке.</p>
+                <time datetime="2026-05-28">28 мая 2026</time>
+              </div>
+            </article>
+          </div>
+          <div class="carousel-nav">
+            <button type="button" data-carousel-prev aria-label="Назад"><i data-lucide="chevron-left"></i></button>
+            <button type="button" data-carousel-next aria-label="Вперёд"><i data-lucide="chevron-right"></i></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="about">
+      <div class="wrap">
+        <h2 class="section-title">О сервисе</h2>
+        <p class="section-sub">Bambusito228 — некастодиальный обменник криптовалют</p>
+        <div class="about-grid">
+          <div class="about-card">
+            <h3>Как мы работаем</h3>
+            <p>Bambusito228 не хранит ваши средства. Вы отправляете криптовалюту на адрес заявки, а после подтверждения сети монеты зачисляются на указанный вами кошелёк. Курс фиксируется при создании ордера.</p>
+            <p style="margin-top:0.75rem">Для наличных USD и RUB приглашаем в офис в Казани — обмен проходит лично с кассиром.</p>
+          </div>
+          <div class="about-card">
+            <h3>Наши принципы</h3>
+            <ul>
+              <li>Прозрачная комиссия без скрытых платежей</li>
+              <li>Актуальные рыночные котировки</li>
+              <li>Поддержка в Telegram в рабочее время</li>
+              <li>Офлайн-пункт для наличных операций</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="support">
+      <div class="wrap">
+        <div class="support-card">
+          <h2 class="section-title" style="margin-bottom:0.5rem">Нужна помощь?</h2>
+          <p>Напишите в Telegram — ответим по статусу ордера, курсам и наличному обмену.</p>
+          <a class="btn-telegram" href="https://t.me/spredofil" target="_blank" rel="noopener noreferrer">
+            <i data-lucide="send"></i> @spredofil
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="privacy">
+      <div class="wrap">
+        <div class="about-card" style="max-width:720px;margin:0 auto">
+          <h3>Политика конфиденциальности</h3>
+          <p>Мы не передаём данные третьим лицам. Адреса кошельков и суммы обмена используются только для исполнения заявки. Используя сервис, вы соглашаетесь с обработкой технических данных (IP, cookies) для обеспечения работы сайта.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap foot-grid">
+      <div class="foot-brand">
+        <a href="/" class="logo-link">
+          <img src="/assets/logo-bambusito.svg" alt="Bambusito228">
+          <span>ambusito228</span>
+        </a>
+        <p>Обмен криптовалют и наличные USD/RUB в Казани. Быстро, прозрачно, без хранения ваших средств.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Сервис</h4>
+        <ul>
+          <li><a href="#about">О сервисе</a></li>
+          <li><a href="#privacy">Конфиденциальность</a></li>
+          <li><a href="#exchange">Обмен</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Популярные пары</h4>
+        <ul>
+          <li><a href="#exchange">XRP / USDT</a></li>
+          <li><a href="#exchange">TRX / USDC</a></li>
+          <li><a href="#exchange">ETH / LTC</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Поддержка</h4>
+        <ul>
+          <li><a href="#news">Блог</a></li>
+          <li><a href="#faq_wrapper">FAQ</a></li>
+          <li><a href="https://t.me/spredofil" target="_blank" rel="noopener noreferrer">Telegram</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="wrap foot-copy">© 2023–2026 Bambusito228. Все права защищены.</div>
+  </footer>
+
+  <link rel="stylesheet" href="/assets/css/chat.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="/assets/js/exchange-app.js"></script>
+  <script src="/assets/js/recent-trades.js"></script>
+  <script src="/assets/js/site.js"></script>
+  <script src="/assets/js/chat-widget.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "name": "bambusito228-exchange",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.8.1",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "grammy": "^1.35.0",
+    "https-proxy-agent": "^9.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^2.7.0",
+    "socks-proxy-agent": "^10.1.0",
+    "uuid": "^11.0.5"
+  }
+}

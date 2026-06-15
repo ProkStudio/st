@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ордер — Bambusito228</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/bambusito.css">
+</head>
+<body class="order-page">
+  <header class="order-header">
+    <a href="/" class="logo"><img src="/assets/logo-bambusito.svg" alt="Bambusito228"></a>
+    <nav>
+      <a href="/#about">О сервисе</a>
+      <a href="/#news">Блог</a>
+      <a href="/#faq_wrapper">FAQ</a>
+      <a href="/#support">Поддержка</a>
+    </nav>
+  </header>
+
+  <div class="order-wrap" id="app">
+    <p style="text-align:center;padding:3rem;color:#8b93b8">Загрузка ордера...</p>
+  </div>
+
+  <script>
+    const CURRENCY_NAMES = {
+      BTC: 'Bitcoin', ETH: 'Ethereum', USDT: 'Tether (TRC20)', XRP: 'Ripple',
+      LTC: 'Litecoin', TRX: 'Tron', BNB: 'BNB', SOL: 'Solana', DOGE: 'Dogecoin',
+      USD: 'USD (Наличные)', RUB: 'RUB',
+    };
+
+    const STATUS_RU = {
+      pending: 'Ожидает оплаты',
+      processing: 'В обработке',
+      completed: 'Выполнен',
+      cancelled: 'Отменён',
+    };
+
+    const id = new URLSearchParams(location.search).get('id');
+    const app = document.getElementById('app');
+    let qrMode = 'address';
+    let orderData = null;
+    let timerId = null;
+
+    function fmtAmount(n) {
+      const x = Number(n);
+      if (!Number.isFinite(x)) return '0';
+      if (x >= 1000) return x.toLocaleString('ru-RU', { maximumFractionDigits: 3 });
+      return x.toFixed(x < 1 ? 8 : 3).replace(/\.?0+$/, '');
+    }
+
+    function fmtDate(ts) {
+      return new Date(ts).toLocaleString('ru-RU', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+      });
+    }
+
+    function qrUrl(order) {
+      const addr = order.deposit_address || '';
+      if (!addr) return '';
+      const text = qrMode === 'amount'
+        ? `${order.amount_from} ${order.from_currency} ${addr}`
+        : addr;
+      return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(text)}`;
+    }
+
+    function remainingText(expiresAt) {
+      const left = expiresAt - Date.now();
+      if (left <= 0) return '0м 0с';
+      const m = Math.floor(left / 60000);
+      const s = Math.floor((left % 60000) / 1000);
+      return `${m}м ${s}с`;
+    }
+
+    function render() {
+      const o = orderData;
+      const ccyFrom = CURRENCY_NAMES[o.from_currency] || o.from_currency;
+      const ccyTo = CURRENCY_NAMES[o.to_currency] || o.to_currency;
+      const deposit = o.deposit_address || '— адрес не задан, свяжитесь с поддержкой —';
+      const isPending = o.status === 'pending';
+      const isProcessing = o.status === 'processing' || o.status === 'completed';
+
+      let actionBlock = '';
+      if (isPending) {
+        actionBlock = `
+            <p class="order-prompt">Нажмите кнопку после перевода криптовалюты</p>
+            <button type="button" class="btn-success" id="confirm-btn">Я отправил</button>`;
+      } else if (isProcessing) {
+        actionBlock = `
+            <div class="order-processing-box">
+              <p>Ваша заявка в обработке, монеты поступят на ваш кошелёк в течение 30 минут</p>
+              <p class="processing-timer">Осталось времени: <span id="processing-timer">${remainingText(o.expires_at)}</span></p>
+            </div>`;
+      } else if (o.status === 'cancelled') {
+        actionBlock = `<div class="order-processing-box"><p>Заявка отменена</p></div>`;
+      }
+
+      app.innerHTML = `
+        <div class="order-summary">
+          <div class="side">
+            <label>Отдаёте</label>
+            <div class="amount">${fmtAmount(o.amount_from)} ${o.from_currency}</div>
+            <div class="sub">${deposit !== '— адрес не задан, свяжитесь с поддержкой —' ? deposit : ''}</div>
+          </div>
+          <img class="swap-icon" src="/assets/strelki.png" alt="">
+          <div class="side" style="text-align:right">
+            <label>Получаете</label>
+            <div class="amount">${fmtAmount(o.amount_to)} ${o.to_currency}</div>
+            <div class="sub">${o.address}</div>
+          </div>
+        </div>
+
+        <div class="order-grid">
+          <aside class="order-meta">
+            <div class="order-id">${o.id}</div>
+            <div class="meta-row">
+              <span>Осталось времени</span>
+              <strong class="timer" id="timer">${remainingText(o.expires_at)}</strong>
+            </div>
+            <div class="meta-row">
+              <span>Тип ордера</span>
+              <strong>${o.order_type === 'fixed' ? 'Фиксированный курс' : 'Плавающий курс'}</strong>
+            </div>
+            <div class="meta-row">
+              <span>Время создания</span>
+              <strong>${fmtDate(o.created_at)}</strong>
+            </div>
+            <div class="meta-row">
+              <span>Статус</span>
+              <strong>${STATUS_RU[o.status] || o.status}</strong>
+            </div>
+          </aside>
+
+          <section class="order-main">
+            <h2>Отправьте <strong>${fmtAmount(o.amount_from)} ${o.from_currency}</strong> (${ccyFrom}) на адрес:</h2>
+            <div class="deposit-address" id="deposit-addr">${deposit}</div>
+            <button type="button" class="btn-copy" id="copy-btn">Скопировать</button>
+            <p class="order-note">Курс будет зафиксирован после получения 2 подтверждений в сети блокчейн.</p>
+
+            <div class="receive-block">
+              <h3>Адрес получения ${o.to_currency}</h3>
+              <div class="addr">${o.address}</div>
+            </div>
+
+            ${actionBlock}
+          </section>
+
+          <aside class="order-qr">
+            ${deposit && deposit.startsWith('—') ? '<p style="color:#8b93b8;font-size:.85rem">QR недоступен — задайте адрес в админке</p>' : `
+              <img id="qr-img" src="${qrUrl(o)}" alt="QR">
+              <div class="qr-tabs">
+                <button type="button" data-mode="address" class="${qrMode === 'address' ? 'active' : ''}">Адрес</button>
+                <button type="button" data-mode="amount" class="${qrMode === 'amount' ? 'active' : ''}">С суммой</button>
+              </div>
+            `}
+          </aside>
+        </div>
+      `;
+
+      document.getElementById('copy-btn')?.addEventListener('click', async () => {
+        if (!o.deposit_address) return;
+        try {
+          await navigator.clipboard.writeText(o.deposit_address);
+          const btn = document.getElementById('copy-btn');
+          btn.textContent = 'Скопировано!';
+          btn.classList.add('copied');
+          setTimeout(() => { btn.textContent = 'Скопировать'; btn.classList.remove('copied'); }, 2000);
+        } catch {
+          alert(o.deposit_address);
+        }
+      });
+
+      document.querySelectorAll('.qr-tabs button').forEach((btn) => {
+        btn.onclick = () => {
+          qrMode = btn.dataset.mode;
+          render();
+        };
+      });
+
+      document.getElementById('confirm-btn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('confirm-btn');
+        btn.disabled = true;
+        btn.textContent = 'Отправляем...';
+        try {
+          const res = await fetch(`/api/orders/${o.id}/confirm`, { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Ошибка');
+          orderData = data.order;
+          render();
+        } catch (e) {
+          alert(e.message);
+          btn.disabled = false;
+          btn.textContent = 'Я отправил';
+        }
+      });
+
+      if (timerId) clearInterval(timerId);
+      timerId = setInterval(() => {
+        if (!orderData) return;
+        const t = remainingText(orderData.expires_at);
+        const el = document.getElementById('timer');
+        const pel = document.getElementById('processing-timer');
+        if (el) el.textContent = t;
+        if (pel) pel.textContent = t;
+      }, 1000);
+    }
+
+    if (!id) {
+      app.innerHTML = '<div class="order-error"><p>Ордер не найден</p><a href="/">На главную</a></div>';
+    } else {
+      fetch('/api/orders/' + id)
+        .then((r) => r.json())
+        .then(({ order }) => {
+          if (!order) throw new Error('not found');
+          orderData = order;
+          document.title = `Ордер ${order.id} — Bambusito228`;
+          render();
+        })
+        .catch(() => {
+          app.innerHTML = '<div class="order-error"><p>Ордер не найден</p><a href="/">На главную</a></div>';
+        });
+    }
+  </script>
+  <link rel="stylesheet" href="/assets/css/chat.css">
+  <script src="/assets/js/chat-widget.js"></script>
+</body>
+</html>
