@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 
 const BASE = 'https://api.bybit.com';
+const BINANCE_BASE = 'https://api.binance.com';
 
 const STABLE = new Set(['USDT', 'USD', 'USDC', 'BUSD', 'USDP', 'TUSD']);
 
@@ -62,6 +63,14 @@ async function publicGet(path, params = {}) {
   return data.result;
 }
 
+async function binanceGet(path, params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const url = `${BINANCE_BASE}${path}${qs ? `?${qs}` : ''}`;
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`Binance HTTP ${res.status}`);
+  return res.json();
+}
+
 async function privateGet(path, params = {}) {
   const { key, secret } = getApiCreds();
   if (!key || !secret) throw new Error('Bybit API keys not configured');
@@ -95,11 +104,33 @@ async function getSpotUsdtPrice(symbol) {
   const hit = priceCache.get(cacheKey);
   if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.price;
 
-  const result = await publicGet('/v5/market/tickers', { category: 'spot', symbol: pair });
-  const ticker = result.list?.[0];
-  if (!ticker?.lastPrice) throw new Error(`Пара ${pair} не найдена на Bybit`);
+  let price = null;
 
-  const price = parseFloat(ticker.lastPrice);
+  try {
+    const result = await publicGet('/v5/market/tickers', { category: 'spot', symbol: pair });
+    const ticker = result.list?.[0];
+    if (ticker?.lastPrice) {
+      price = parseFloat(ticker.lastPrice);
+    }
+  } catch {
+    // Fallback provider below.
+  }
+
+  if (!Number.isFinite(price) || price <= 0) {
+    try {
+      const ticker = await binanceGet('/api/v3/ticker/price', { symbol: pair });
+      if (ticker?.price) {
+        price = parseFloat(ticker.price);
+      }
+    } catch {
+      // Fall through to unified error below.
+    }
+  }
+
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error(`Не удалось получить цену пары ${pair}`);
+  }
+
   priceCache.set(cacheKey, { ts: Date.now(), price });
   return price;
 }
