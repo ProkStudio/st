@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#06050c">
+  <title>Админка — Bambusito228</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/admin/tg/app.css">
+</head>
+<body>
+  <div id="boot-screen" class="screen boot">
+    <div class="boot-spinner"></div>
+    <p>Вход в админку…</p>
+  </div>
+
+  <div id="denied-screen" class="screen boot hidden">
+    <div class="denied-icon">🔒</div>
+    <h1>Только из Telegram</h1>
+    <p id="denied-text">Откройте бота → кнопка Menu внизу → «🎛 Админка»</p>
+  </div>
+
+  <div id="app" class="hidden">
+    <header class="app-header">
+      <div>
+        <p class="app-eyebrow" id="header-greeting">Bambusito228</p>
+        <h1 id="header-title">Обзор</h1>
+      </div>
+      <button type="button" class="icon-btn" id="btn-refresh" title="Обновить" aria-label="Обновить">↻</button>
+    </header>
+
+    <main class="app-main" id="app-main">
+      <section id="panel-overview" class="panel active">
+        <div class="stat-grid" id="stat-grid"></div>
+        <div class="card">
+          <div class="card-head">
+            <h2>Последние ордера</h2>
+          </div>
+          <div id="recent-orders" class="stack-list"></div>
+        </div>
+      </section>
+
+      <section id="panel-orders" class="panel">
+        <div id="orders-list" class="stack-list"></div>
+      </section>
+
+      <section id="panel-chat" class="panel">
+        <div id="chat-sessions" class="stack-list"></div>
+      </section>
+
+      <section id="panel-settings" class="panel">
+        <div class="card">
+          <h2>Источник курса</h2>
+          <p class="hint" id="rate-active-line">—</p>
+          <button type="button" class="btn-secondary btn-block" id="btn-rate-check">Проверить провайдеры</button>
+          <div id="rate-probes" class="probe-list"></div>
+          <label class="field">
+            Режим
+            <select id="rate-provider">
+              <option value="auto">Авто</option>
+              <option value="bybit">Bybit</option>
+              <option value="binance">Binance</option>
+              <option value="okx">OKX</option>
+              <option value="coingecko">CoinGecko</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="card">
+          <h2>Основные</h2>
+          <label class="field">Наценка, %<input type="number" id="markup" step="0.01" inputmode="decimal"></label>
+          <label class="field">1 USD = <input type="number" id="usd-rub" step="0.01" inputmode="decimal"> RUB</label>
+          <label class="field">TTL ордера, мин<input type="number" id="order-ttl" min="5" max="180" inputmode="numeric"></label>
+          <label class="field">Кошелёк для оплаты<input type="text" id="deposit-wallet" autocomplete="off"></label>
+          <label class="field">Имя в чате<input type="text" id="chat-operator"></label>
+        </div>
+
+        <p class="toast" id="settings-toast"></p>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" id="bottom-nav">
+      <button type="button" class="nav-btn active" data-tab="overview"><span>📊</span>Обзор</button>
+      <button type="button" class="nav-btn" data-tab="orders"><span>📋</span>Ордера</button>
+      <button type="button" class="nav-btn" data-tab="chat"><span>💬</span>Чат<b class="nav-badge hidden" id="chat-badge">0</b></button>
+      <button type="button" class="nav-btn" data-tab="settings"><span>⚙️</span>Ещё</button>
+    </nav>
+  </div>
+
+  <div id="chat-overlay" class="chat-overlay hidden">
+    <header class="chat-overlay-head">
+      <button type="button" class="icon-btn" id="chat-back" aria-label="Назад">←</button>
+      <div class="chat-overlay-meta" id="chat-overlay-meta"></div>
+    </header>
+    <div class="chat-messages" id="chat-messages"></div>
+    <form class="chat-compose" id="chat-form">
+      <input type="text" id="chat-input" placeholder="Ответить…" maxlength="2000" autocomplete="off">
+      <button type="submit" class="send-btn" aria-label="Отправить">➤</button>
+    </form>
+  </div>
+
+  <script src="/admin/tg/app.js"></script>
+</body>
+</html>

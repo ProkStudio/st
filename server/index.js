@@ -28,6 +28,10 @@ app.get('/admin', (_req, res) => {
   res.sendFile(path.join(root, 'admin', 'index.html'));
 });
 
+app.get('/admin/tg', (_req, res) => {
+  res.sendFile(path.join(root, 'admin', 'tg', 'index.html'));
+});
+
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api')) return next();
   if (path.extname(req.path)) return next();

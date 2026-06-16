@@ -16,7 +16,7 @@ const {
   markChatSessionRead,
   countUnreadChats,
 } = require('../db');
-const { authMiddleware, login, changePassword } = require('../auth');
+const { authMiddleware, login, changePassword, signToken } = require('../auth');
 const { convertAmount } = require('../rates');
 const {
   probeAllProviders,
@@ -26,6 +26,7 @@ const {
   RATE_PROVIDERS,
   normalizeProviderMode,
 } = require('../bybit');
+const { validateTelegramWebAppInitData, parseAdminIds } = require('../telegramWebApp');
 
 function createAdminRouter(notifyOrderUpdate) {
   const router = express.Router();
@@ -35,6 +36,39 @@ function createAdminRouter(notifyOrderUpdate) {
     const token = login(username, password);
     if (!token) return res.status(401).json({ error: 'Неверный логин или пароль' });
     res.json({ token });
+  });
+
+  router.post('/tg-auth', (req, res) => {
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) {
+      return res.status(503).json({ error: 'Telegram бот не настроен' });
+    }
+
+    const parsed = validateTelegramWebAppInitData(req.body?.initData, botToken);
+    if (!parsed) {
+      return res.status(401).json({ error: 'Недействительные данные Telegram' });
+    }
+
+    const adminIds = parseAdminIds();
+    if (!adminIds.includes(parsed.user.id)) {
+      return res.status(403).json({ error: 'Доступ только для администраторов' });
+    }
+
+    const name = [parsed.user.first_name, parsed.user.last_name].filter(Boolean).join(' ');
+    const token = signToken({
+      role: 'admin',
+      username: `tg_${parsed.user.id}`,
+      tgId: parsed.user.id,
+    });
+
+    res.json({
+      token,
+      user: {
+        id: parsed.user.id,
+        name,
+        username: parsed.user.username || null,
+      },
+    });
   });
 
   router.use(authMiddleware);

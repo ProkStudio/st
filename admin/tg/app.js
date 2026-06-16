@@ -1,0 +1,421 @@
+const API = '/api/admin';
+const STATUS_LABELS = {
+  pending: 'Ожидает',
+  processing: 'В работе',
+  completed: 'Выполнен',
+  cancelled: 'Отменён',
+};
+const TAB_TITLES = {
+  overview: 'Обзор',
+  orders: 'Ордера',
+  chat: 'Чат',
+  settings: 'Настройки',
+};
+
+const tg = window.Telegram?.WebApp;
+let token = null;
+let activeTab = 'overview';
+let activeChatId = null;
+let pollTimer = null;
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function formatDate(ts) {
+  return new Date(ts).toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function haptic(type = 'light') {
+  try {
+    tg?.HapticFeedback?.impactOccurred(type);
+  } catch { /* noop */ }
+}
+
+function initTelegramUi() {
+  if (!tg) return;
+  tg.ready();
+  tg.expand();
+  if (typeof tg.disableVerticalSwipes === 'function') tg.disableVerticalSwipes();
+
+  const root = document.documentElement;
+  const p = tg.themeParams || {};
+  if (p.bg_color) root.style.setProperty('--tg-theme-bg-color', p.bg_color);
+  if (p.text_color) root.style.setProperty('--tg-theme-text-color', p.text_color);
+  if (p.hint_color) root.style.setProperty('--tg-theme-hint-color', p.hint_color);
+  if (p.link_color) root.style.setProperty('--tg-theme-link-color', p.link_color);
+  if (p.button_color) root.style.setProperty('--tg-theme-button-color', p.button_color);
+  if (p.button_text_color) root.style.setProperty('--tg-theme-button-text-color', p.button_text_color);
+  if (p.secondary_bg_color) root.style.setProperty('--tg-theme-secondary-bg-color', p.secondary_bg_color);
+
+  if (p.bg_color) tg.setBackgroundColor(p.bg_color);
+  if (p.secondary_bg_color) tg.setHeaderColor(p.secondary_bg_color);
+
+  tg.BackButton.onClick(() => {
+    if (activeChatId) closeChatOverlay();
+  });
+
+  tg.MainButton.onClick(() => saveSettings());
+}
+
+function setMainButtonVisible(visible) {
+  if (!tg?.MainButton) return;
+  if (visible) {
+    tg.MainButton.setText('Сохранить настройки');
+    tg.MainButton.color = tg.themeParams?.button_color || '#7c3aed';
+    tg.MainButton.textColor = tg.themeParams?.button_text_color || '#ffffff';
+    tg.MainButton.show();
+  } else {
+    tg.MainButton.hide();
+  }
+}
+
+function showDenied(msg) {
+  $('#boot-screen').classList.add('hidden');
+  $('#denied-screen').classList.remove('hidden');
+  $('#denied-text').textContent = msg;
+}
+
+function showApp() {
+  $('#boot-screen').classList.add('hidden');
+  $('#denied-screen').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...opts.headers,
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Ошибка запроса');
+  return data;
+}
+
+async function authenticate() {
+  if (!tg?.initData) {
+    showDenied('Откройте бота в Telegram → Menu (≡) внизу → «🎛 Админка»');
+    return false;
+  }
+
+  const res = await fetch(`${API}/tg-auth`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: tg.initData }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    showDenied(data.error || 'Нет доступа. Проверьте TELEGRAM_ADMIN_IDS.');
+    return false;
+  }
+
+  token = data.token;
+  if (data.user?.name) {
+    $('#header-greeting').textContent = `Привет, ${data.user.name}`;
+  }
+  return true;
+}
+
+function badge(status) {
+  return `<span class="badge badge-${status}">${STATUS_LABELS[status] || status}</span>`;
+}
+
+function orderCard(o, showDate = false) {
+  const statusSelect = `
+    <select class="status-select" data-id="${o.id}">
+      ${Object.keys(STATUS_LABELS).map((s) => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${STATUS_LABELS[s]}</option>`).join('')}
+    </select>`;
+  return `
+    <article class="order-card">
+      <div class="order-top">
+        <span class="order-id">#${esc(o.id)}</span>
+        ${badge(o.status)}
+      </div>
+      <div class="order-pair">${esc(o.amount_from)} ${esc(o.from_currency)} → ${Number(o.amount_to).toFixed(6)} ${esc(o.to_currency)}</div>
+      <div class="order-meta">${esc(o.address)}</div>
+      ${showDate ? `<div class="order-meta">${formatDate(o.created_at)}</div>` : ''}
+      ${statusSelect}
+    </article>`;
+}
+
+function bindStatusSelects(root) {
+  root.querySelectorAll('.status-select').forEach((sel) => {
+    sel.onchange = async () => {
+      try {
+        haptic('medium');
+        await api(`/orders/${sel.dataset.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: sel.value }),
+        });
+        await refreshAll();
+      } catch (e) {
+        tg?.showAlert?.(e.message) || alert(e.message);
+      }
+    };
+  });
+}
+
+function updateChatBadge(n) {
+  const b = $('#chat-badge');
+  if (!b) return;
+  if (n > 0) {
+    b.textContent = n > 9 ? '9+' : n;
+    b.classList.remove('hidden');
+  } else {
+    b.classList.add('hidden');
+  }
+}
+
+async function loadOverview() {
+  const data = await api('/dashboard');
+  const s = data.stats;
+  const st = data.settings;
+
+  $('#stat-grid').innerHTML = `
+    <div class="stat"><span>Всего</span><strong>${s.total}</strong></div>
+    <div class="stat warn"><span>Ожидают</span><strong>${s.pending}</strong></div>
+    <div class="stat ok"><span>Выполнено</span><strong>${s.completed}</strong></div>
+    <div class="stat accent"><span>Наценка</span><strong>${st.markup_percent}%</strong></div>
+  `;
+
+  updateChatBadge(st.unread_chats || 0);
+
+  const orders = await api('/orders?limit=5');
+  const recent = $('#recent-orders');
+  recent.innerHTML = orders.orders.length
+    ? orders.orders.map((o) => orderCard(o)).join('')
+    : '<p class="empty">Ордеров пока нет</p>';
+  bindStatusSelects(recent);
+}
+
+async function loadOrders() {
+  const { orders } = await api('/orders?limit=100');
+  const list = $('#orders-list');
+  list.innerHTML = orders.length
+    ? orders.map((o) => orderCard(o, true)).join('')
+    : '<p class="empty">Ордеров пока нет</p>';
+  bindStatusSelects(list);
+}
+
+function renderChatSessions(sessions) {
+  const box = $('#chat-sessions');
+  if (!sessions.length) {
+    box.innerHTML = '<p class="empty">Сообщений пока нет</p>';
+    return;
+  }
+  box.innerHTML = sessions.map((s) => `
+    <button type="button" class="chat-item" data-id="${esc(s.id)}">
+      <div class="chat-item-top">
+        <strong>${esc(s.country || 'Неизвестно')}</strong>
+        ${s.unread_admin > 0 ? `<span class="chat-unread">${s.unread_admin}</span>` : ''}
+      </div>
+      <div class="chat-preview">${esc((s.last_preview || '').slice(0, 80))}</div>
+      <div class="chat-time">${formatDate(s.last_message_at)} · ${esc(s.ip || '—')}</div>
+    </button>
+  `).join('');
+
+  box.querySelectorAll('.chat-item').forEach((btn) => {
+    btn.onclick = () => openChatOverlay(btn.dataset.id);
+  });
+}
+
+async function loadChatSessions() {
+  const { sessions } = await api('/chat/sessions');
+  renderChatSessions(sessions);
+  const unread = sessions.reduce((a, s) => a + (s.unread_admin > 0 ? 1 : 0), 0);
+  updateChatBadge(unread);
+}
+
+function renderChatMessages(messages) {
+  const box = $('#chat-messages');
+  box.innerHTML = messages.map((m) => `
+    <div class="bubble ${m.sender === 'admin' ? 'admin' : 'user'}">
+      <div>${esc(m.body)}</div>
+      <time>${formatDate(m.created_at)}</time>
+    </div>
+  `).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+async function openChatOverlay(id) {
+  activeChatId = id;
+  haptic('light');
+  const data = await api(`/chat/sessions/${id}`);
+  const loc = [data.session.country, data.session.city].filter(Boolean).join(', ');
+  $('#chat-overlay-meta').innerHTML = `
+    <strong>${esc(loc || 'Посетитель')}</strong>
+    <span>IP: ${esc(data.session.ip || '—')}</span>
+  `;
+  renderChatMessages(data.messages);
+  $('#chat-overlay').classList.remove('hidden');
+  $('#app').classList.add('chat-mode');
+  tg?.BackButton?.show();
+  loadChatSessions().catch(() => {});
+}
+
+function closeChatOverlay() {
+  activeChatId = null;
+  $('#chat-overlay').classList.add('hidden');
+  $('#app').classList.remove('chat-mode');
+  tg?.BackButton?.hide();
+  loadChatSessions().catch(() => {});
+}
+
+async function loadSettingsForm() {
+  const data = await api('/dashboard');
+  const st = data.settings;
+  $('#markup').value = st.markup_percent;
+  $('#usd-rub').value = st.usd_rub_rate;
+  $('#order-ttl').value = st.order_ttl_minutes || 30;
+  $('#deposit-wallet').value = st.deposit_wallet || '';
+  $('#chat-operator').value = st.chat_operator_name || 'Bambusito228 Support';
+  $('#rate-provider').value = st.rate_provider || 'auto';
+  await loadRateStatus().catch(() => {});
+}
+
+async function loadRateStatus() {
+  const data = await api('/rate-status');
+  const line = data.activeError
+    ? `Ошибка: ${data.activeError}`
+    : `Сейчас: ${data.activeProviderLabel || '—'}${data.activePrice ? ` · BTC $${Number(data.activePrice).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : ''}`;
+  $('#rate-active-line').textContent = line;
+
+  const probes = data.probes || [];
+  $('#rate-probes').innerHTML = probes.map((p) => `
+    <div class="probe ${p.ok ? 'ok' : 'fail'}">
+      <strong>${esc(p.label)}</strong>
+      <small>${p.ok ? `$${Number(p.price).toFixed(0)} · ${p.latencyMs}ms` : esc((p.error || 'fail').slice(0, 40))}</small>
+    </div>
+  `).join('');
+}
+
+function toast(msg, ok = true) {
+  const el = $('#settings-toast');
+  el.textContent = msg;
+  el.style.color = ok ? 'var(--green)' : 'var(--red)';
+  setTimeout(() => { el.textContent = ''; }, 2500);
+}
+
+async function saveSettings() {
+  try {
+    haptic('medium');
+    await api('/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        markup_percent: $('#markup').value,
+        usd_rub_rate: $('#usd-rub').value,
+        order_ttl_minutes: $('#order-ttl').value,
+        deposit_wallet: $('#deposit-wallet').value,
+        chat_operator_name: $('#chat-operator').value,
+        rate_provider: $('#rate-provider').value,
+      }),
+    });
+    toast('Сохранено');
+    tg?.MainButton?.hideProgress?.();
+    await refreshAll();
+  } catch (e) {
+    toast(e.message, false);
+    tg?.showAlert?.(e.message);
+  }
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  $$('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+  $$('.panel').forEach((p) => p.classList.remove('active'));
+  $(`#panel-${tab}`).classList.add('active');
+  $('#header-title').textContent = TAB_TITLES[tab] || tab;
+  setMainButtonVisible(tab === 'settings');
+
+  if (tab === 'orders') loadOrders().catch(onError);
+  if (tab === 'chat') loadChatSessions().catch(onError);
+  if (tab === 'settings') loadSettingsForm().catch(onError);
+  if (tab === 'overview') loadOverview().catch(onError);
+}
+
+async function refreshAll() {
+  if (activeTab === 'overview') await loadOverview();
+  if (activeTab === 'orders') await loadOrders();
+  if (activeTab === 'chat' && !activeChatId) await loadChatSessions();
+  if (activeTab === 'settings') await loadSettingsForm();
+  if (activeChatId) {
+    const data = await api(`/chat/sessions/${activeChatId}`);
+    renderChatMessages(data.messages);
+  }
+}
+
+function onError(e) {
+  if (String(e.message).includes('unauthorized') || String(e.message).includes('invalid_token')) {
+    showDenied('Сессия истекла. Закройте и откройте Mini App снова.');
+  }
+}
+
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(() => {
+    refreshAll().catch(() => {});
+  }, 8000);
+}
+
+$$('.nav-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    haptic('light');
+    switchTab(btn.dataset.tab);
+  });
+});
+
+$('#btn-refresh').addEventListener('click', () => {
+  haptic('light');
+  refreshAll().catch(onError);
+});
+
+$('#btn-rate-check').addEventListener('click', () => {
+  haptic('light');
+  loadRateStatus().catch((e) => toast(e.message, false));
+});
+
+$('#chat-back').addEventListener('click', closeChatOverlay);
+
+$('#chat-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!activeChatId) return;
+  const input = $('#chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  try {
+    haptic('light');
+    await api(`/chat/sessions/${activeChatId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+    input.value = '';
+    await openChatOverlay(activeChatId);
+  } catch (err) {
+    tg?.showAlert?.(err.message) || alert(err.message);
+  }
+});
+
+(async function boot() {
+  initTelegramUi();
+  try {
+    const ok = await authenticate();
+    if (!ok) return;
+    showApp();
+    switchTab('overview');
+    startPolling();
+  } catch (e) {
+    showDenied(e.message || 'Ошибка входа');
+  }
+})();

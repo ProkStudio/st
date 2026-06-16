@@ -1,5 +1,6 @@
 const { Bot, Keyboard } = require('grammy');
 const { resolveTelegramFetch } = require('./telegramProxy');
+const { getMiniAppUrl } = require('./telegramWebApp');
 const {
   getAllSettings,
   setSetting,
@@ -318,6 +319,20 @@ function createTelegramBot() {
         console.log(`🌐 Telegram подключён через прокси: ${label}`);
       }
       bot = new Bot(token, { client: { fetch: fetchFn } });
+
+      try {
+        const miniAppUrl = getMiniAppUrl();
+        await bot.api.setChatMenuButton({
+          menu_button: {
+            type: 'web_app',
+            text: '🎛 Админка',
+            web_app: { url: miniAppUrl },
+          },
+        });
+        console.log(`📱 Mini App menu → ${miniAppUrl}`);
+      } catch (e) {
+        console.error('Menu button setup failed:', e.message);
+      }
 
       notifyAdmins = async (text, extra = {}) => {
         for (const id of adminIds) {
