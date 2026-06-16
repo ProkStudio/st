@@ -1,6 +1,7 @@
 const { Bot, Keyboard } = require('grammy');
 const { resolveTelegramFetch } = require('./telegramProxy');
 const { getMiniAppUrl } = require('./telegramWebApp');
+const { shouldNotify } = require('./settings');
 const {
   getAllSettings,
   setSetting,
@@ -349,12 +350,14 @@ function createTelegramBot() {
       };
 
       notifyNewOrder = async (order) => {
+        if (!shouldNotify('notif_new_order')) return;
         await notifyAdmins(`🆕 <b>Новый ордер!</b>\n\n${formatOrder(order)}`);
       };
 
       notifyOrderUpdate = noop;
 
       notifyChatMessage = async (session, msg) => {
+        if (!shouldNotify('notif_chat_message')) return;
         const loc = [session.country, session.city].filter(Boolean).join(', ');
         const { formatDeviceInfo } = require('../deviceInfo');
         const deviceLine = formatDeviceInfo(session.device_info, session.user_agent);

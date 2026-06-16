@@ -49,30 +49,57 @@
       </section>
 
       <section id="panel-settings" class="panel">
-        <div class="card">
-          <h2>Источник курса</h2>
-          <p class="hint" id="rate-active-line">—</p>
-          <button type="button" class="btn-secondary btn-block" id="btn-rate-check">Проверить провайдеры</button>
-          <div id="rate-probes" class="probe-list"></div>
-          <label class="field">
-            Режим
-            <select id="rate-provider">
-              <option value="auto">Авто</option>
-              <option value="bybit">Bybit</option>
-              <option value="binance">Binance</option>
-              <option value="okx">OKX</option>
-              <option value="coingecko">CoinGecko</option>
-            </select>
-          </label>
+        <nav class="tg-settings-nav" id="tg-settings-nav">
+          <button type="button" class="tg-pill active" data-tg-settings="quick">Быстрое</button>
+          <button type="button" class="tg-pill" data-tg-settings="wallet">Кошелёк</button>
+          <button type="button" class="tg-pill" data-tg-settings="rates">Курсы</button>
+          <button type="button" class="tg-pill" data-tg-settings="chat">Чат</button>
+          <button type="button" class="tg-pill" data-tg-settings="order">Ордер</button>
+        </nav>
+
+        <div class="tg-settings-screen active" data-tg-screen="quick">
+          <div class="card">
+            <label class="field">Наценка, %<input type="number" id="markup" step="0.01" inputmode="decimal"></label>
+            <label class="field">1 USD = <input type="number" id="usd-rub" step="0.01" inputmode="decimal"> RUB</label>
+            <label class="field toggle-field"><input type="checkbox" id="maintenance-mode"> Техрежим (обмен выкл.)</label>
+          </div>
         </div>
 
-        <div class="card">
-          <h2>Основные</h2>
-          <label class="field">Наценка, %<input type="number" id="markup" step="0.01" inputmode="decimal"></label>
-          <label class="field">1 USD = <input type="number" id="usd-rub" step="0.01" inputmode="decimal"> RUB</label>
-          <label class="field">TTL ордера, мин<input type="number" id="order-ttl" min="5" max="180" inputmode="numeric"></label>
-          <label class="field">Кошелёк для оплаты<input type="text" id="deposit-wallet" autocomplete="off"></label>
-          <label class="field">Имя в чате<input type="text" id="chat-operator"></label>
+        <div class="tg-settings-screen" data-tg-screen="wallet">
+          <div class="card">
+            <label class="field">Кошелёк для оплаты<input type="text" id="deposit-wallet" autocomplete="off"></label>
+          </div>
+        </div>
+
+        <div class="tg-settings-screen" data-tg-screen="rates">
+          <div class="card">
+            <h2>Источник курса</h2>
+            <p class="hint" id="rate-active-line">—</p>
+            <button type="button" class="btn-secondary btn-block" id="btn-rate-check">Проверить провайдеры</button>
+            <div id="rate-probes" class="probe-list"></div>
+            <label class="field">Режим
+              <select id="rate-provider">
+                <option value="auto">Авто</option>
+                <option value="bybit">Bybit</option>
+                <option value="binance">Binance</option>
+                <option value="okx">OKX</option>
+                <option value="coingecko">CoinGecko</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="tg-settings-screen" data-tg-screen="chat">
+          <div class="card">
+            <label class="field">Имя в чате<input type="text" id="chat-operator"></label>
+            <label class="field">Приветствие<textarea id="chat-welcome" rows="2"></textarea></label>
+          </div>
+        </div>
+
+        <div class="tg-settings-screen" data-tg-screen="order">
+          <div class="card">
+            <label class="field">TTL ордера, мин<input type="number" id="order-ttl" min="5" max="180" inputmode="numeric"></label>
+          </div>
         </div>
 
         <p class="toast" id="settings-toast"></p>

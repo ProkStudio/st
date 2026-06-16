@@ -1,5 +1,6 @@
 const { queryDeposits, DEPOSIT_STATUS } = require('./bybit');
 const { isDepositSeen, markDepositSeen } = require('./db');
+const { shouldNotify } = require('./settings');
 
 const POLL_MS = 30_000;
 
@@ -45,7 +46,7 @@ function startBybitDepositWatcher(notifyAdmins) {
         const id = String(d.id || d.txID || `${d.coin}-${d.amount}-${d.createTime}`);
         if (isDepositSeen(id)) continue;
         markDepositSeen(id, d.coin, d.amount, d.status);
-        if ([1, 2, 3].includes(Number(d.status))) {
+        if ([1, 2, 3].includes(Number(d.status)) && shouldNotify('notif_bybit_deposit')) {
           await notifyAdmins(formatDeposit(d));
         }
       }

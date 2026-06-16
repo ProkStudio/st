@@ -220,15 +220,14 @@ async function loadRateStatus() {
 
 async function loadDashboard() {
   const data = await api('/dashboard');
+  fillSettingsForm(data.settings);
+  updateQuickCards(data.settings);
+
   $('#stat-total').textContent = data.stats.total;
   $('#stat-pending').textContent = data.stats.pending;
   $('#stat-completed').textContent = data.stats.completed;
   $('#stat-fee').textContent = data.settings.markup_percent + '%';
   updateChatBadge(data.settings.unread_chats || 0);
-
-  const rateProvider = data.settings.rate_provider || 'auto';
-  $('#rate-provider-input').value = rateProvider;
-  $('#stat-rate-mode').textContent = `Режим: ${RATE_MODE_LABELS[rateProvider] || rateProvider}`;
 
   loadRateStatus().catch(() => {});
 
@@ -243,12 +242,136 @@ async function loadDashboard() {
   const table = $('#orders-table');
   table.innerHTML = all.orders.map((o) => renderOrderRow(o)).join('');
   bindStatusSelects(table.parentElement);
+}
 
-  $('#markup-input').value = data.settings.markup_percent;
-  $('#usd-rub-input').value = data.settings.usd_rub_rate;
-  $('#order-ttl-input').value = data.settings.order_ttl_minutes || 30;
-  $('#deposit-wallet-input').value = data.settings.deposit_wallet || '';
-  $('#chat-operator-input').value = data.settings.chat_operator_name || 'Bambusito228 Support';
+function fillSettingsForm(st) {
+  if (!st) return;
+  $('#markup-input').value = st.markup_percent;
+  $('#exchange-min-input').value = st.exchange_min_usd ?? 50;
+  $('#exchange-max-input').value = st.exchange_max_usd ?? 50000;
+  $('#usd-rub-input').value = st.usd_rub_rate;
+  $('#rate-provider-input').value = st.rate_provider || 'auto';
+  $('#rate-refresh-input').value = st.rate_refresh_sec ?? 60;
+  $('#order-ttl-input').value = st.order_ttl_minutes || 30;
+  $('#deposit-wallet-input').value = st.deposit_wallet || '';
+  $('#chat-operator-input').value = st.chat_operator_name || '';
+  $('#chat-welcome-input').value = st.chat_welcome_message || '';
+  $('#chat-offline-input').value = st.chat_offline_message || '';
+  $('#chat-hours-input').value = st.chat_work_hours || '09:00-21:00';
+  $('#chat-online-input').checked = !!st.chat_show_online;
+  $('#notif-new-order').checked = !!st.notif_new_order;
+  $('#notif-chat').checked = !!st.notif_chat_message;
+  $('#notif-bybit').checked = !!st.notif_bybit_deposit;
+  $('#notif-maintenance').checked = !!st.notif_maintenance;
+  $('#notif-order-status').checked = !!st.notif_order_status;
+  $('#site-name-input').value = st.site_name || '';
+  $('#site-tagline-input').value = st.site_tagline || '';
+  const accent = st.accent_color || '#22c55e';
+  $('#accent-color-input').value = accent;
+  $('#accent-hex-input').value = accent;
+  $('#contact-tg-input').value = st.contact_telegram || '';
+  $('#contact-email-input').value = st.contact_email || '';
+  $('#rules-text-input').value = st.rules_text || '';
+  $('#faq-text-input').value = st.faq_text || '';
+  $('#maintenance-mode-input').checked = !!st.maintenance_mode;
+  $('#maintenance-mode-input').dataset.wasOn = st.maintenance_mode ? '1' : '';
+  $('#maintenance-msg-input').value = st.maintenance_message || '';
+  $('#admin-username-display').textContent = st.admin_username || 'admin';
+  $('#stat-rate-mode').textContent = `Режим: ${RATE_MODE_LABELS[st.rate_provider] || st.rate_provider}`;
+}
+
+function updateQuickCards(st) {
+  $('#quick-markup').textContent = `${st.markup_percent}%`;
+  $('#quick-usd-rub').textContent = st.usd_rub_rate;
+  $('#quick-rate-src').textContent = RATE_MODE_LABELS[st.rate_provider] || st.rate_provider;
+  const w = st.deposit_wallet || '';
+  $('#quick-wallet').textContent = w ? `…${w.slice(-8)}` : 'не задан';
+  const maint = !!st.maintenance_mode;
+  $('#quick-maintenance').checked = maint;
+  $('#quick-maintenance-label').textContent = maint ? 'Вкл' : 'Выкл';
+}
+
+function collectSectionPayload(section) {
+  switch (section) {
+    case 'exchange':
+      return {
+        markup_percent: $('#markup-input').value,
+        exchange_min_usd: $('#exchange-min-input').value,
+        exchange_max_usd: $('#exchange-max-input').value,
+      };
+    case 'rates':
+      return {
+        rate_provider: $('#rate-provider-input').value,
+        rate_refresh_sec: $('#rate-refresh-input').value,
+        usd_rub_rate: $('#usd-rub-input').value,
+      };
+    case 'wallets':
+      return { deposit_wallet: $('#deposit-wallet-input').value };
+    case 'orders':
+      return { order_ttl_minutes: $('#order-ttl-input').value };
+    case 'chat':
+      return {
+        chat_operator_name: $('#chat-operator-input').value,
+        chat_welcome_message: $('#chat-welcome-input').value,
+        chat_offline_message: $('#chat-offline-input').value,
+        chat_work_hours: $('#chat-hours-input').value,
+        chat_show_online: $('#chat-online-input').checked,
+      };
+    case 'notifications':
+      return {
+        notif_new_order: $('#notif-new-order').checked,
+        notif_chat_message: $('#notif-chat').checked,
+        notif_bybit_deposit: $('#notif-bybit').checked,
+        notif_maintenance: $('#notif-maintenance').checked,
+        notif_order_status: $('#notif-order-status').checked,
+      };
+    case 'site':
+      return {
+        site_name: $('#site-name-input').value,
+        site_tagline: $('#site-tagline-input').value,
+        accent_color: $('#accent-hex-input').value || $('#accent-color-input').value,
+        contact_telegram: $('#contact-tg-input').value,
+        contact_email: $('#contact-email-input').value,
+        rules_text: $('#rules-text-input').value,
+        faq_text: $('#faq-text-input').value,
+        maintenance_mode: $('#maintenance-mode-input').checked,
+        maintenance_message: $('#maintenance-msg-input').value,
+      };
+    default:
+      return {};
+  }
+}
+
+async function saveSettingsSection(section) {
+  if (section === 'site' && $('#maintenance-mode-input').checked && !$('#maintenance-mode-input').dataset.wasOn) {
+    if (!confirm('Выключить обмен для клиентов?')) {
+      $('#maintenance-mode-input').checked = false;
+      return;
+    }
+  }
+  try {
+    await api('/settings', { method: 'PATCH', body: JSON.stringify(collectSectionPayload(section)) });
+    toast('Сохранено');
+    loadDashboard();
+  } catch (e) {
+    toast(e.message, false);
+  }
+}
+
+function switchSettingsPanel(name) {
+  $$('.settings-pill').forEach((b) => b.classList.toggle('active', b.dataset.settings === name));
+  $$('.settings-panel').forEach((p) => p.classList.toggle('active', p.dataset.settingsPanel === name));
+  if (name === 'rates') loadRateStatus().catch(() => {});
+  refreshIcons();
+}
+
+function openSettingsTab(panel) {
+  $$('.nav-item').forEach((b) => b.classList.remove('active'));
+  $$('.tab').forEach((t) => t.classList.remove('active'));
+  document.querySelector('.nav-item[data-tab="settings"]')?.classList.add('active');
+  $('#tab-settings').classList.add('active');
+  $('#page-title').textContent = 'Настройки';
+  switchSettingsPanel(panel || 'exchange');
 }
 
 $('#login-form').onsubmit = async (e) => {
@@ -285,9 +408,69 @@ $$('.nav-item').forEach((btn) => {
     $('#page-title').textContent = titles[btn.dataset.tab];
     refreshIcons();
     if (btn.dataset.tab === 'chat') loadChatSessions();
-    if (btn.dataset.tab === 'settings') loadRateStatus().catch(() => {});
+    if (btn.dataset.tab === 'settings') {
+      switchSettingsPanel('exchange');
+      loadRateStatus().catch(() => {});
+    }
   };
 });
+
+$$('.settings-pill').forEach((btn) => {
+  btn.onclick = () => switchSettingsPanel(btn.dataset.settings);
+});
+
+$$('.save-section').forEach((btn) => {
+  btn.onclick = () => saveSettingsSection(btn.dataset.section);
+});
+
+$$('.quick-card[data-goto-settings]').forEach((card) => {
+  card.querySelector('.quick-edit')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openSettingsTab(card.dataset.gotoSettings);
+  });
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('.toggle-row')) return;
+    openSettingsTab(card.dataset.gotoSettings);
+  });
+});
+
+$('#quick-maintenance').onchange = async () => {
+  const on = $('#quick-maintenance').checked;
+  if (on && !confirm('Выключить обмен для клиентов?')) {
+    $('#quick-maintenance').checked = false;
+    return;
+  }
+  try {
+    await api('/settings', { method: 'PATCH', body: JSON.stringify({ maintenance_mode: on }) });
+    toast(on ? 'Техрежим включён' : 'Техрежим выключен');
+    loadDashboard();
+  } catch (e) {
+    $('#quick-maintenance').checked = !on;
+    toast(e.message, false);
+  }
+};
+
+$('#accent-color-input').oninput = () => {
+  $('#accent-hex-input').value = $('#accent-color-input').value;
+};
+$('#accent-hex-input').oninput = () => {
+  const v = $('#accent-hex-input').value;
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) $('#accent-color-input').value = v;
+};
+
+$('#save-password-btn').onclick = async () => {
+  const pwd = $('#pwd-new').value;
+  if (!pwd) return toast('Введите новый пароль', false);
+  try {
+    await api('/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword: $('#pwd-current').value, newPassword: pwd }),
+    });
+    $('#pwd-current').value = '';
+    $('#pwd-new').value = '';
+    toast('Пароль изменён');
+  } catch (e) { toast(e.message, false); }
+};
 
 function toast(msg, ok = true) {
   const el = $('#settings-toast');
@@ -296,32 +479,9 @@ function toast(msg, ok = true) {
   setTimeout(() => { el.textContent = ''; }, 3000);
 }
 
-$('#save-all-settings').onclick = async () => {
-  try {
-    await api('/settings', {
-      method: 'PATCH',
-      body: JSON.stringify({
-        markup_percent: $('#markup-input').value,
-        usd_rub_rate: $('#usd-rub-input').value,
-        order_ttl_minutes: $('#order-ttl-input').value,
-        deposit_wallet: $('#deposit-wallet-input').value,
-        chat_operator_name: $('#chat-operator-input').value,
-        rate_provider: $('#rate-provider-input').value,
-      }),
-    });
-    const pwd = $('#pwd-new').value;
-    if (pwd) {
-      await api('/change-password', {
-        method: 'POST',
-        body: JSON.stringify({ currentPassword: $('#pwd-current').value, newPassword: pwd }),
-      });
-      $('#pwd-current').value = '';
-      $('#pwd-new').value = '';
-    }
-    toast('Настройки сохранены');
-    loadDashboard();
-  } catch (e) { toast(e.message, false); }
-};
+$('#refresh-orders').onclick = loadDashboard;
+$('#refresh-chat').onclick = loadChatSessions;
+$('#refresh-rate-status').onclick = () => loadRateStatus().catch((e) => toast(e.message, false));
 
 $('#chat-reply-form').onsubmit = async (e) => {
   e.preventDefault();
@@ -340,10 +500,6 @@ $('#chat-reply-form').onsubmit = async (e) => {
     alert(err.message);
   }
 };
-
-$('#refresh-orders').onclick = loadDashboard;
-$('#refresh-chat').onclick = loadChatSessions;
-$('#refresh-rate-status').onclick = () => loadRateStatus().catch((e) => toast(e.message, false));
 
 if (token) {
   showScreen('dashboard');

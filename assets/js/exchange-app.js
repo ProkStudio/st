@@ -28,6 +28,12 @@
   let rateAbort = null;
   let debounceTimer = null;
   let openPicker = null;
+  let siteConfig = {
+    exchange_min_usd: 50,
+    exchange_max_usd: 50000,
+    maintenance_mode: false,
+    maintenance_message: '',
+  };
 
   const els = {};
 
@@ -158,6 +164,11 @@
   }
 
   function updateSubmit() {
+    if (siteConfig.maintenance_mode) {
+      els.submit.disabled = true;
+      els.submit.title = siteConfig.maintenance_message || 'Обмен приостановлен';
+      return;
+    }
     if (isCash(els.from.value) || isCash(els.to.value)) {
       els.submit.disabled = true;
       return;
@@ -165,6 +176,24 @@
     const amt = parseFloat(els.amountFrom.value);
     const addr = els.wallet.value.trim();
     els.submit.disabled = !(amt > 0 && addr.length >= 8);
+    els.submit.title = '';
+  }
+
+  function limitsHint() {
+    const min = siteConfig.exchange_min_usd;
+    const max = siteConfig.exchange_max_usd;
+    if (min && max) return `Лимит: $${min} – $${max} (эквивалент)`;
+    return '';
+  }
+
+  async function loadSiteConfig() {
+    try {
+      const res = await fetch('/api/config');
+      siteConfig = await res.json();
+      const hint = limitsHint();
+      if (hint && els.rateHint && !els.rateHint.textContent) els.rateHint.textContent = hint;
+      updateSubmit();
+    } catch { /* ignore */ }
   }
 
   async function fetchRate() {
@@ -242,6 +271,11 @@
 
   async function submitOrder() {
     if (els.submit.disabled) return;
+
+    if (siteConfig.maintenance_mode) {
+      alert(siteConfig.maintenance_message || 'Обмен временно приостановлен.');
+      return;
+    }
 
     const from = els.from.value;
     const to = els.to.value;
@@ -325,7 +359,13 @@
     els.swapBtn.addEventListener('click', swapCurrencies);
     els.submit.addEventListener('click', submitOrder);
 
-    scheduleRate();
+    loadSiteConfig().then(() => {
+      if (els.rateHint) {
+        const extra = limitsHint();
+        if (extra) els.rateHint.textContent = extra;
+      }
+      scheduleRate();
+    });
   }
 
   if (document.readyState === 'loading') {

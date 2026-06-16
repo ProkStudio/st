@@ -96,7 +96,14 @@ const PAIR_ALIASES = {
 };
 
 const priceCache = new Map();
-const CACHE_TTL = 15_000;
+function getCacheTtl() {
+  try {
+    const { getRateCacheTtlMs } = require('./settings');
+    return getRateCacheTtlMs();
+  } catch {
+    return 60_000;
+  }
+}
 
 let lastFetchInfo = { provider: null, symbol: null, at: null };
 
@@ -236,7 +243,7 @@ async function getSpotUsdtPriceDetailed(symbol, providerMode = 'auto', skipCache
   const cacheKey = `${mode}:${pairs[0]}`;
   if (!skipCache) {
     const hit = priceCache.get(cacheKey);
-    if (hit && Date.now() - hit.ts < CACHE_TTL) {
+    if (hit && Date.now() - hit.ts < getCacheTtl()) {
       rememberFetch(hit.provider, symbol);
       return { price: hit.price, provider: hit.provider };
     }

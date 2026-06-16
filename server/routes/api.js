@@ -8,7 +8,8 @@ const {
   resolveDepositAddress,
   updateOrderStatus,
 } = require('../db');
-const { convertAmount } = require('../rates');
+const { convertAmount, getConversionRate } = require('../rates');
+const { buildPublicConfig, isOn } = require('../settings');
 
 function createApiRouter(notifyOrder, notifyOrderUpdate) {
   const router = express.Router();
@@ -18,10 +19,11 @@ function createApiRouter(notifyOrder, notifyOrderUpdate) {
   });
 
   router.get('/settings/public', (_req, res) => {
-    res.json({
-      markup_percent: parseFloat(getSetting('markup_percent', '1.5')),
-      site_name: getSetting('site_name', 'Bambusito228'),
-    });
+    res.json(buildPublicConfig());
+  });
+
+  router.get('/config', (_req, res) => {
+    res.json(buildPublicConfig());
   });
 
   router.get('/price', async (req, res) => {
@@ -60,12 +62,34 @@ function createApiRouter(notifyOrder, notifyOrderUpdate) {
 
   router.post('/orders', async (req, res) => {
     try {
+      if (isOn(getSetting('maintenance_mode', '0'))) {
+        return res.status(503).json({
+          error: getSetting('maintenance_message', 'Обмен временно приостановлен. Попробуйте позже.'),
+        });
+      }
+
       const { from, to, amountFrom, address, chatSessionId } = req.body;
       if (!from || !to || !amountFrom || !address) {
         return res.status(400).json({ error: 'Заполните все поля' });
       }
 
       const settings = getAllSettings();
+      const amt = parseFloat(amountFrom);
+      if (!amt || amt <= 0) {
+        return res.status(400).json({ error: 'Некорректная сумма' });
+      }
+
+      const minUsd = parseFloat(settings.exchange_min_usd || '50');
+      const maxUsd = parseFloat(settings.exchange_max_usd || '50000');
+      const { rate: toUsdRate } = await getConversionRate(from, 'USD', settings);
+      const usdEquiv = amt * toUsdRate;
+      if (usdEquiv < minUsd) {
+        return res.status(400).json({ error: `Минимальная сумма ≈ $${minUsd}` });
+      }
+      if (usdEquiv > maxUsd) {
+        return res.status(400).json({ error: `Максимальная сумма ≈ $${maxUsd}` });
+      }
+
       const markup = settings.markup_percent || '1.5';
       const conversion = await convertAmount(from, to, amountFrom, markup, settings);
       const ttlMin = parseInt(getSetting('order_ttl_minutes', '30'), 10) || 30;

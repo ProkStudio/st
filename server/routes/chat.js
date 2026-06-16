@@ -1,7 +1,6 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const {
-  getSetting,
   getChatSession,
   createChatSession,
   updateChatSessionMeta,
@@ -11,6 +10,7 @@ const {
 } = require('../db');
 const { getClientIp, lookupGeo } = require('../geo');
 const { mergeDeviceInfo } = require('../deviceInfo');
+const { buildChatPublicConfig } = require('../settings');
 
 async function touchSession(req, session, devicePayload) {
   const ip = getClientIp(req);
@@ -37,10 +37,7 @@ function createChatRouter(notifyChatMessage) {
   const router = express.Router();
 
   router.get('/config', (_req, res) => {
-    res.json({
-      operatorName: getSetting('chat_operator_name', 'Bambusito228 Support'),
-      statusText: 'Мы отвечаем сразу же',
-    });
+    res.json(buildChatPublicConfig());
   });
 
   router.post('/session', async (req, res) => {

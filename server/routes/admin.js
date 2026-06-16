@@ -18,6 +18,10 @@ const {
   countUnreadChats,
 } = require('../db');
 const { authMiddleware, login, changePassword, signToken } = require('../auth');
+const {
+  applySettingsPatch,
+  formatAdminSettings,
+} = require('../settings');
 const { convertAmount } = require('../rates');
 const {
   probeAllProviders,
@@ -29,7 +33,7 @@ const {
 } = require('../bybit');
 const { validateTelegramWebAppInitData, parseAdminIds } = require('../telegramWebApp');
 
-function createAdminRouter(notifyOrderUpdate) {
+function createAdminRouter(notifyOrderUpdate, notifyAdmins) {
   const router = express.Router();
 
   router.post('/login', (req, res) => {
@@ -83,16 +87,11 @@ function createAdminRouter(notifyOrderUpdate) {
     const settings = getAllSettings();
     res.json({
       stats: s,
-      settings: {
-        markup_percent: parseFloat(settings.markup_percent),
-        usd_rub_rate: parseFloat(settings.usd_rub_rate),
-        site_name: settings.site_name,
-        order_ttl_minutes: parseInt(settings.order_ttl_minutes || '30', 10),
+      settings: formatAdminSettings(settings, {
         deposit_wallet: getDepositWallet(),
-        chat_operator_name: settings.chat_operator_name || 'Bambusito228 Support',
         unread_chats: countUnreadChats(),
         rate_provider: normalizeProviderMode(settings.rate_provider),
-      },
+      }),
     });
   });
 
@@ -132,59 +131,26 @@ function createAdminRouter(notifyOrderUpdate) {
 
   router.get('/settings', (_req, res) => {
     const s = getAllSettings();
-    res.json({
-      markup_percent: parseFloat(s.markup_percent),
-      usd_rub_rate: parseFloat(s.usd_rub_rate),
-      site_name: s.site_name,
-      admin_username: s.admin_username,
-      order_ttl_minutes: parseInt(s.order_ttl_minutes || '30', 10),
-      deposit_wallet: getDepositWallet(),
-      chat_operator_name: s.chat_operator_name || 'Bambusito228 Support',
-      rate_provider: normalizeProviderMode(s.rate_provider),
-    });
+    res.json(formatAdminSettings(s, { deposit_wallet: getDepositWallet() }));
   });
 
-  router.patch('/settings', (req, res) => {
-    const {
-      markup_percent,
-      usd_rub_rate,
-      site_name,
-      order_ttl_minutes,
-      deposit_wallet,
-      chat_operator_name,
-      rate_provider,
-    } = req.body;
-    if (markup_percent !== undefined) {
-      const v = parseFloat(markup_percent);
-      if (Number.isNaN(v)) {
-        return res.status(400).json({ error: 'Наценка должна быть числом' });
-      }
-      setSetting('markup_percent', v);
-    }
-    if (usd_rub_rate !== undefined) {
-      const v = parseFloat(usd_rub_rate);
-      if (Number.isNaN(v) || v <= 0) {
-        return res.status(400).json({ error: 'Некорректный курс USD/RUB' });
-      }
-      setSetting('usd_rub_rate', v);
-    }
-    if (site_name) setSetting('site_name', site_name);
-    if (order_ttl_minutes !== undefined) {
-      const v = parseInt(order_ttl_minutes, 10);
-      if (Number.isNaN(v) || v < 5 || v > 180) {
-        return res.status(400).json({ error: 'Время ордера: от 5 до 180 минут' });
-      }
-      setSetting('order_ttl_minutes', v);
-    }
-    if (deposit_wallet !== undefined) setDepositWallet(deposit_wallet);
-    if (chat_operator_name) setSetting('chat_operator_name', chat_operator_name);
-    if (rate_provider !== undefined) {
-      const mode = normalizeProviderMode(rate_provider);
+  router.patch('/settings', async (req, res) => {
+    const { errors, maintenanceActivated } = applySettingsPatch(req.body, { setDepositWallet });
+    if (errors.length) return res.status(400).json({ error: errors[0] });
+
+    if (req.body.rate_provider !== undefined) {
+      const mode = normalizeProviderMode(req.body.rate_provider);
       if (!RATE_PROVIDERS.includes(mode)) {
         return res.status(400).json({ error: 'Некорректный источник курса' });
       }
       setSetting('rate_provider', mode);
     }
+
+    if (maintenanceActivated && notifyAdmins) {
+      const msg = getAllSettings().maintenance_message || 'Обмен временно приостановлен.';
+      await notifyAdmins(`⚠️ <b>Техрежим включён</b>\n\n${msg}`);
+    }
+
     res.json({ ok: true });
   });
 

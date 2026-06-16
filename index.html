@@ -34,12 +34,14 @@
     </div>
   </header>
 
+  <div id="maintenance-banner" class="maintenance-banner hidden" role="alert"></div>
+
   <main>
     <section class="hero" id="exchange">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <h1>Обмен криптовалют <em>без лишних шагов</em></h1>
-          <p>Мгновенный расчёт курса, прозрачная комиссия и поддержка в Telegram. Наличные USD и RUB — в офисе в Казани.</p>
+          <h1 id="hero-title">Обмен криптовалют <em>без лишних шагов</em></h1>
+          <p id="hero-tagline">Мгновенный расчёт курса, прозрачная комиссия и поддержка в Telegram. Наличные USD и RUB — в офисе в Казани.</p>
           <div class="hero-badges">
             <span class="badge"><i data-lucide="zap"></i> Быстрый обмен</span>
             <span class="badge"><i data-lucide="shield-check"></i> Некастодиальный</span>
@@ -312,9 +314,18 @@
         <div class="support-card">
           <h2 class="section-title" style="margin-bottom:0.5rem">Нужна помощь?</h2>
           <p>Напишите в Telegram — ответим по статусу ордера, курсам и наличному обмену.</p>
-          <a class="btn-telegram" href="https://t.me/spredofil" target="_blank" rel="noopener noreferrer">
-            <i data-lucide="send"></i> @spredofil
+          <a class="btn-telegram" id="support-telegram-link" href="https://t.me/spredofil" target="_blank" rel="noopener noreferrer">
+            <i data-lucide="send"></i> <span id="support-telegram-label">@spredofil</span>
           </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section hidden" id="rules-section">
+      <div class="wrap">
+        <div class="about-card" style="max-width:720px;margin:0 auto">
+          <h3>Правила обмена</h3>
+          <div id="rules-content" class="rules-content"></div>
         </div>
       </div>
     </section>
@@ -336,7 +347,7 @@
           <img src="/assets/logo-bambusito.svg" alt="Bambusito228">
           <span>ambusito228</span>
         </a>
-        <p>Обмен криптовалют и наличные USD/RUB в Казани. Быстро, прозрачно, без хранения ваших средств.</p>
+        <p id="foot-tagline">Обмен криптовалют и наличные USD/RUB в Казани. Быстро, прозрачно, без хранения ваших средств.</p>
       </div>
       <div class="foot-col">
         <h4>Сервис</h4>
@@ -359,11 +370,12 @@
         <ul>
           <li><a href="#news">Блог</a></li>
           <li><a href="#faq_wrapper">FAQ</a></li>
-          <li><a href="https://t.me/spredofil" target="_blank" rel="noopener noreferrer">Telegram</a></li>
+          <li><a id="foot-telegram-link" href="https://t.me/spredofil" target="_blank" rel="noopener noreferrer">Telegram</a></li>
+          <li><a id="foot-email-link" href="#" class="hidden">Email</a></li>
         </ul>
       </div>
     </div>
-    <div class="wrap foot-copy">© 2023–2026 Bambusito228. Все права защищены.</div>
+    <div class="wrap foot-copy">© 2023–2026 <span id="foot-site-name">Bambusito228</span>. Все права защищены.</div>
   </footer>
 
   <link rel="stylesheet" href="/assets/css/chat.css">

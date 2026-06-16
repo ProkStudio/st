@@ -10,6 +10,8 @@
   --text-dim: #6d6588;
   --purple: #a855f7;
   --purple-deep: #7c3aed;
+  --accent: #22c55e;
+  --accent-glow: rgba(34, 197, 94, 0.25);
   --indigo: #6366f1;
   --gradient: linear-gradient(135deg, #a855f7 0%, #6366f1 55%, #4f46e5 100%);
   --gradient-soft: linear-gradient(180deg, rgba(124, 58, 237, 0.12) 0%, transparent 70%);
@@ -38,6 +40,19 @@ body {
 
 img { max-width: 100%; height: auto; display: block; }
 a { color: var(--purple); text-decoration: none; }
+
+.maintenance-banner {
+  background: rgba(239, 68, 68, 0.15);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fecaca;
+  text-align: center;
+  padding: 0.65rem 1rem;
+  font-size: 0.9rem;
+}
+
+.maintenance-banner.hidden { display: none; }
+
+.section.hidden { display: none; }
 a:hover { color: #c4b5fd; }
 
 .wrap { width: var(--wrap); margin: 0 auto; }

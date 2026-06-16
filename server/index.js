@@ -20,7 +20,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use('/api', createApiRouter(notifyNewOrder, notifyOrderUpdate));
 app.use('/api/chat', createChatRouter(notifyChatMessage));
-app.use('/api/admin', createAdminRouter(notifyOrderUpdate));
+app.use('/api/admin', createAdminRouter(notifyOrderUpdate, notifyAdmins));
 
 app.use(express.static(root));
 

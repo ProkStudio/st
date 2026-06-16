@@ -76,6 +76,40 @@
               <span class="stat-sub" id="stat-rate-mode">Авто</span>
             </article>
           </div>
+
+          <div class="quick-settings panel">
+            <div class="panel-head"><h3>Быстрые настройки</h3></div>
+            <div class="quick-settings-grid">
+              <article class="quick-card" data-goto-settings="exchange">
+                <span class="quick-label">Наценка</span>
+                <strong id="quick-markup">—</strong>
+                <button type="button" class="btn-ghost btn-sm quick-edit">Изменить</button>
+              </article>
+              <article class="quick-card" data-goto-settings="rates">
+                <span class="quick-label">USD / RUB</span>
+                <strong id="quick-usd-rub">—</strong>
+                <button type="button" class="btn-ghost btn-sm quick-edit">Изменить</button>
+              </article>
+              <article class="quick-card" data-goto-settings="rates">
+                <span class="quick-label">Курс</span>
+                <strong id="quick-rate-src">—</strong>
+                <button type="button" class="btn-ghost btn-sm quick-edit">Изменить</button>
+              </article>
+              <article class="quick-card quick-card-toggle" data-goto-settings="site">
+                <span class="quick-label">Техрежим</span>
+                <label class="toggle-row">
+                  <input type="checkbox" id="quick-maintenance">
+                  <span id="quick-maintenance-label">Выкл</span>
+                </label>
+              </article>
+              <article class="quick-card" data-goto-settings="wallets">
+                <span class="quick-label">Кошелёк</span>
+                <strong id="quick-wallet" class="mono">—</strong>
+                <button type="button" class="btn-ghost btn-sm quick-edit">Изменить</button>
+              </article>
+            </div>
+          </div>
+
           <div class="panel">
             <div class="panel-head"><h3>Последние ордера</h3></div>
             <div id="recent-orders" class="orders-list"></div>
@@ -131,90 +165,129 @@
         </div>
 
         <div id="tab-settings" class="tab">
-          <div class="settings-stack">
-            <section class="panel settings-section">
-              <h3><i data-lucide="wallet"></i> Кошелёк для приёма оплаты</h3>
-              <p class="muted">Один адрес для всех ордеров. Показывается на странице заказа и в QR.</p>
-              <label class="field-block">
-                Адрес кошелька
-                <input type="text" id="deposit-wallet-input" placeholder="bc1q... / T... / rXRP...">
-              </label>
-            </section>
+          <nav class="settings-subnav" id="settings-subnav">
+            <button type="button" class="settings-pill active" data-settings="exchange">Обмен</button>
+            <button type="button" class="settings-pill" data-settings="rates">Курсы</button>
+            <button type="button" class="settings-pill" data-settings="wallets">Кошелёк</button>
+            <button type="button" class="settings-pill" data-settings="orders">Ордера</button>
+            <button type="button" class="settings-pill" data-settings="chat">Чат</button>
+            <button type="button" class="settings-pill" data-settings="notifications">Уведомления</button>
+            <button type="button" class="settings-pill" data-settings="site">Сайт</button>
+            <button type="button" class="settings-pill" data-settings="security">Безопасность</button>
+          </nav>
 
-            <section class="panel settings-section">
-              <h3><i data-lucide="line-chart"></i> Источник курса</h3>
-              <p class="muted">Откуда берётся рыночная цена для крипто-пар. В режиме «Авто» сервер перебирает источники по очереди.</p>
-
-              <div class="rate-status-panel" id="rate-status-panel">
-                <div class="rate-status-head">
-                  <div>
-                    <span class="rate-status-label">Сейчас используется</span>
-                    <strong id="rate-active-provider">—</strong>
-                  </div>
-                  <button type="button" class="btn-ghost btn-sm" id="refresh-rate-status">Проверить</button>
-                </div>
-                <div class="rate-probe-list" id="rate-probe-list"></div>
+          <div class="settings-panels">
+            <section class="settings-panel active" data-settings-panel="exchange">
+              <div class="panel settings-section">
+                <h3><i data-lucide="percent"></i> Наценка и лимиты</h3>
+                <p class="muted">Наценка применяется ко всем парам. Лимиты — в USD-эквиваленте суммы «отдаёте».</p>
+                <label class="field-block inline-field">Наценка, %<input type="number" id="markup-input" step="0.01"></label>
+                <label class="field-block inline-field">Мин. сумма, USD<input type="number" id="exchange-min-input" min="0" step="1"></label>
+                <label class="field-block inline-field">Макс. сумма, USD<input type="number" id="exchange-max-input" min="1" step="1"></label>
               </div>
-
-              <label class="field-block">
-                Режим выбора источника
-                <select id="rate-provider-input">
-                  <option value="auto">Авто — Bybit → Binance → OKX → CoinGecko</option>
-                  <option value="bybit">Только Bybit</option>
-                  <option value="binance">Только Binance</option>
-                  <option value="okx">Только OKX</option>
-                  <option value="coingecko">Только CoinGecko</option>
-                </select>
-              </label>
+              <div class="settings-actions"><button type="button" class="btn-primary save-section" data-section="exchange">Сохранить обмен</button></div>
             </section>
 
-            <section class="panel settings-section">
-              <h3><i data-lucide="percent"></i> Наценка от рыночного курса</h3>
-              <p class="muted">2 = клиент получает на 2% меньше. -5 = на 5% больше рыночного.</p>
-              <label class="field-block inline-field">
-                Наценка, %
-                <input type="number" id="markup-input" step="0.01" value="1.5">
-              </label>
+            <section class="settings-panel" data-settings-panel="rates">
+              <div class="panel settings-section">
+                <h3><i data-lucide="line-chart"></i> Источник курса</h3>
+                <p class="muted">В режиме «Авто» сервер перебирает Bybit → Binance → OKX → CoinGecko.</p>
+                <div class="rate-status-panel" id="rate-status-panel">
+                  <div class="rate-status-head">
+                    <div><span class="rate-status-label">Сейчас используется</span><strong id="rate-active-provider">—</strong></div>
+                    <button type="button" class="btn-ghost btn-sm" id="refresh-rate-status">Проверить</button>
+                  </div>
+                  <div class="rate-probe-list" id="rate-probe-list"></div>
+                </div>
+                <label class="field-block">Режим<select id="rate-provider-input">
+                  <option value="auto">Авто</option><option value="bybit">Bybit</option><option value="binance">Binance</option><option value="okx">OKX</option><option value="coingecko">CoinGecko</option>
+                </select></label>
+                <label class="field-block inline-field">Кэш курса, сек<input type="number" id="rate-refresh-input" min="30" max="300" step="1"></label>
+              </div>
+              <div class="panel settings-section">
+                <h3><i data-lucide="banknote"></i> USD / RUB</h3>
+                <p class="muted">Для направлений с наличными</p>
+                <label class="field-block inline-field">1 USD = <input type="number" id="usd-rub-input" min="1" step="0.01"> RUB</label>
+              </div>
+              <div class="settings-actions"><button type="button" class="btn-primary save-section" data-section="rates">Сохранить курсы</button></div>
             </section>
 
-            <section class="panel settings-section">
-              <h3><i data-lucide="banknote"></i> Курс USD / RUB</h3>
-              <p class="muted">Для направлений с наличными</p>
-              <label class="field-block inline-field">
-                1 USD =
-                <input type="number" id="usd-rub-input" min="1" step="0.01" value="92.5">
-                RUB
-              </label>
+            <section class="settings-panel" data-settings-panel="wallets">
+              <div class="panel settings-section">
+                <h3><i data-lucide="wallet"></i> Кошелёк для оплаты</h3>
+                <p class="muted">Один адрес для всех монет. Показывается на странице заказа и в QR.</p>
+                <label class="field-block">Адрес<input type="text" id="deposit-wallet-input" placeholder="bc1q... / T..."></label>
+              </div>
+              <div class="settings-actions"><button type="button" class="btn-primary save-section" data-section="wallets">Сохранить кошелёк</button></div>
             </section>
 
-            <section class="panel settings-section">
-              <h3><i data-lucide="clock"></i> Время жизни ордера</h3>
-              <p class="muted">Таймер на странице заказа</p>
-              <label class="field-block inline-field">
-                <input type="number" id="order-ttl-input" min="5" max="180" value="30">
-                минут
-              </label>
+            <section class="settings-panel" data-settings-panel="orders">
+              <div class="panel settings-section">
+                <h3><i data-lucide="clock"></i> Время жизни ордера</h3>
+                <p class="muted">Таймер на странице заказа после создания</p>
+                <label class="field-block inline-field"><input type="number" id="order-ttl-input" min="5" max="180"> минут</label>
+              </div>
+              <div class="settings-actions"><button type="button" class="btn-primary save-section" data-section="orders">Сохранить ордера</button></div>
             </section>
 
-            <section class="panel settings-section">
-              <h3><i data-lucide="message-square"></i> Чат на сайте</h3>
-              <label class="field-block">
-                Имя оператора в шапке чата
-                <input type="text" id="chat-operator-input" value="Bambusito228 Support">
-              </label>
+            <section class="settings-panel" data-settings-panel="chat">
+              <div class="panel settings-section">
+                <h3><i data-lucide="message-square"></i> Чат на сайте</h3>
+                <p class="muted">Виджет в правом нижнем углу. Часы — по Москве.</p>
+                <label class="field-block">Имя оператора<input type="text" id="chat-operator-input"></label>
+                <label class="field-block">Приветствие<textarea id="chat-welcome-input" rows="2"></textarea></label>
+                <label class="field-block">Сообщение вне часов работы<textarea id="chat-offline-input" rows="2"></textarea></label>
+                <label class="field-block inline-field">Часы работы<input type="text" id="chat-hours-input" placeholder="09:00-21:00"></label>
+                <label class="field-block toggle-field"><input type="checkbox" id="chat-online-input"> Показывать статус «онлайн»</label>
+              </div>
+              <div class="settings-actions"><button type="button" class="btn-primary save-section" data-section="chat">Сохранить чат</button></div>
             </section>
 
-            <section class="panel settings-section">
-              <h3><i data-lucide="key-round"></i> Смена пароля</h3>
-              <label class="field-block">Текущий пароль<input type="password" id="pwd-current"></label>
-              <label class="field-block">Новый пароль<input type="password" id="pwd-new"></label>
+            <section class="settings-panel" data-settings-panel="notifications">
+              <div class="panel settings-section">
+                <h3><i data-lucide="bell"></i> Telegram-уведомления</h3>
+                <p class="muted">Кому слать — список TELEGRAM_ADMIN_IDS в Railway.</p>
+                <label class="field-block toggle-field"><input type="checkbox" id="notif-new-order"> Новый ордер</label>
+                <label class="field-block toggle-field"><input type="checkbox" id="notif-chat"> Сообщение в чате</label>
+                <label class="field-block toggle-field"><input type="checkbox" id="notif-bybit"> Депозит на Bybit</label>
+                <label class="field-block toggle-field"><input type="checkbox" id="notif-maintenance"> Включение техрежима</label>
+                <label class="field-block toggle-field"><input type="checkbox" id="notif-order-status"> Смена статуса ордера</label>
+              </div>
+              <div class="settings-actions"><button type="button" class="btn-primary save-section" data-section="notifications">Сохранить уведомления</button></div>
             </section>
 
-            <div class="settings-actions">
-              <button class="btn-primary btn-lg" id="save-all-settings">Сохранить все настройки</button>
-              <p class="toast" id="settings-toast"></p>
-            </div>
+            <section class="settings-panel" data-settings-panel="site">
+              <div class="panel settings-section">
+                <h3><i data-lucide="palette"></i> Брендинг и тексты</h3>
+                <label class="field-block">Название сайта<input type="text" id="site-name-input"></label>
+                <label class="field-block">Слоган<input type="text" id="site-tagline-input"></label>
+                <label class="field-block color-field">Акцент <input type="color" id="accent-color-input"><input type="text" id="accent-hex-input" maxlength="7" placeholder="#22c55e"></label>
+                <label class="field-block">Telegram<input type="text" id="contact-tg-input" placeholder="@username"></label>
+                <label class="field-block">Email<input type="email" id="contact-email-input"></label>
+                <label class="field-block">Правила обмена<textarea id="rules-text-input" rows="4"></textarea></label>
+                <label class="field-block">FAQ (текст)<textarea id="faq-text-input" rows="4"></textarea></label>
+              </div>
+              <div class="panel settings-section">
+                <h3><i data-lucide="construction"></i> Техрежим</h3>
+                <p class="muted">Клиенты не смогут создавать ордера. Админка работает.</p>
+                <label class="field-block toggle-field"><input type="checkbox" id="maintenance-mode-input"> Обмен приостановлен</label>
+                <label class="field-block">Сообщение на сайте<textarea id="maintenance-msg-input" rows="2"></textarea></label>
+              </div>
+              <div class="settings-actions"><button type="button" class="btn-primary save-section" data-section="site">Сохранить сайт</button></div>
+            </section>
+
+            <section class="settings-panel" data-settings-panel="security">
+              <div class="panel settings-section">
+                <h3><i data-lucide="key-round"></i> Смена пароля</h3>
+                <p class="muted">Логин: <code id="admin-username-display">admin</code></p>
+                <label class="field-block">Текущий пароль<input type="password" id="pwd-current" autocomplete="current-password"></label>
+                <label class="field-block">Новый пароль<input type="password" id="pwd-new" autocomplete="new-password"></label>
+                <button type="button" class="btn-primary" id="save-password-btn">Сменить пароль</button>
+              </div>
+              <p class="muted settings-soon">2FA и IP whitelist — в следующих версиях.</p>
+            </section>
           </div>
+          <p class="toast" id="settings-toast"></p>
         </div>
       </main>
     </section>

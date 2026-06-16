@@ -15,6 +15,7 @@ const TAB_TITLES = {
 const tg = window.Telegram?.WebApp;
 let token = null;
 let activeTab = 'overview';
+let activeTgSettings = 'quick';
 let activeChatId = null;
 let pollTimer = null;
 
@@ -377,11 +378,21 @@ async function loadSettingsForm() {
   const st = data.settings;
   $('#markup').value = st.markup_percent;
   $('#usd-rub').value = st.usd_rub_rate;
+  $('#maintenance-mode').checked = !!st.maintenance_mode;
+  $('#maintenance-mode').dataset.wasOn = st.maintenance_mode ? '1' : '';
   $('#order-ttl').value = st.order_ttl_minutes || 30;
   $('#deposit-wallet').value = st.deposit_wallet || '';
   $('#chat-operator').value = st.chat_operator_name || 'Bambusito228 Support';
+  $('#chat-welcome').value = st.chat_welcome_message || '';
   $('#rate-provider').value = st.rate_provider || 'auto';
   await loadRateStatus().catch(() => {});
+}
+
+function switchTgSettings(screen) {
+  activeTgSettings = screen;
+  $$('.tg-pill').forEach((b) => b.classList.toggle('active', b.dataset.tgSettings === screen));
+  $$('.tg-settings-screen').forEach((s) => s.classList.toggle('active', s.dataset.tgScreen === screen));
+  if (screen === 'rates') loadRateStatus().catch(() => {});
 }
 
 async function loadRateStatus() {
@@ -410,17 +421,27 @@ function toast(msg, ok = true) {
 async function saveSettings() {
   try {
     haptic('medium');
-    await api('/settings', {
-      method: 'PATCH',
-      body: JSON.stringify({
-        markup_percent: $('#markup').value,
-        usd_rub_rate: $('#usd-rub').value,
-        order_ttl_minutes: $('#order-ttl').value,
-        deposit_wallet: $('#deposit-wallet').value,
-        chat_operator_name: $('#chat-operator').value,
-        rate_provider: $('#rate-provider').value,
-      }),
-    });
+    const payload = {
+      markup_percent: $('#markup').value,
+      usd_rub_rate: $('#usd-rub').value,
+      maintenance_mode: $('#maintenance-mode').checked,
+      order_ttl_minutes: $('#order-ttl').value,
+      deposit_wallet: $('#deposit-wallet').value,
+      chat_operator_name: $('#chat-operator').value,
+      chat_welcome_message: $('#chat-welcome').value,
+      rate_provider: $('#rate-provider').value,
+    };
+    if (payload.maintenance_mode && !$('#maintenance-mode').dataset.wasOn) {
+      const ok = await new Promise((resolve) => {
+        if (tg?.showConfirm) tg.showConfirm('Выключить обмен для клиентов?', resolve);
+        else resolve(confirm('Выключить обмен для клиентов?'));
+      });
+      if (!ok) {
+        $('#maintenance-mode').checked = false;
+        payload.maintenance_mode = false;
+      }
+    }
+    await api('/settings', { method: 'PATCH', body: JSON.stringify(payload) });
     toast('Сохранено');
     tg?.MainButton?.hideProgress?.();
     await refreshAll();
@@ -483,6 +504,13 @@ $('#btn-refresh').addEventListener('click', () => {
 $('#btn-rate-check').addEventListener('click', () => {
   haptic('light');
   loadRateStatus().catch((e) => toast(e.message, false));
+});
+
+$$('.tg-pill').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    haptic('light');
+    switchTgSettings(btn.dataset.tgSettings);
+  });
 });
 
 $('#chat-back').addEventListener('click', closeChatOverlay);

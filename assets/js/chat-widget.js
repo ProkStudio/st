@@ -12,7 +12,14 @@
   }
 
   let sessionId = localStorage.getItem(STORAGE_KEY);
-  let config = { operatorName: 'Bambusito228 Support', statusText: 'Мы отвечаем сразу же' };
+  let config = {
+    operatorName: 'Bambusito228 Support',
+    statusText: 'Мы отвечаем сразу же',
+    welcomeMessage: '',
+    online: true,
+    showOnline: true,
+  };
+  let welcomed = false;
   let lastTs = 0;
   let pollTimer = null;
   let panelOpen = false;
@@ -117,6 +124,10 @@
     root.appendChild(btn);
     document.body.appendChild(root);
 
+    if (!config.showOnline || !config.online) {
+      btn.querySelector('.online-dot')?.classList.add('offline');
+    }
+
     const box = panel.querySelector('.bambus-chat-messages');
     const form = panel.querySelector('form');
     const input = panel.querySelector('input');
@@ -128,6 +139,12 @@
         const data = await ensureSession();
         lastTs = 0;
         renderMessages(box, data.messages || [], false);
+        if (!welcomed && config.welcomeMessage) {
+          welcomed = true;
+          const div = el('div', 'bambus-chat-msg admin', '');
+          div.innerHTML = `${escapeHtml(config.welcomeMessage)}`;
+          box.insertBefore(div, box.firstChild);
+        }
         input.focus();
         if (!pollTimer) pollTimer = setInterval(() => pollMessages(box), 3000);
       }

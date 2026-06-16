@@ -41,6 +41,10 @@
   border-radius: 50%;
 }
 
+.bambus-chat-btn .online-dot.offline {
+  background: #6b7280;
+}
+
 .bambus-chat-panel {
   position: absolute;
   right: 0;
