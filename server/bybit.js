@@ -7,6 +7,19 @@ const COINGECKO_BASE = 'https://api.coingecko.com';
 
 const STABLE = new Set(['USDT', 'USD', 'USDC', 'BUSD', 'USDP', 'TUSD']);
 
+const RATE_PROVIDERS = ['auto', 'bybit', 'binance', 'okx', 'coingecko'];
+const PROVIDER_CHAIN = ['bybit', 'binance', 'okx', 'coingecko'];
+
+const PROVIDER_LABELS = {
+  auto: 'Авто',
+  bybit: 'Bybit',
+  binance: 'Binance',
+  okx: 'OKX',
+  coingecko: 'CoinGecko',
+  fixed: 'Фиксированный',
+  manual: 'Вручную (USD/RUB)',
+};
+
 const SPOT_PAIR = {
   BTC: 'BTCUSDT',
   ETH: 'ETHUSDT',
@@ -85,8 +98,15 @@ const PAIR_ALIASES = {
 const priceCache = new Map();
 const CACHE_TTL = 15_000;
 
+let lastFetchInfo = { provider: null, symbol: null, at: null };
+
 function normalizeEnv(value) {
   return String(value || '').trim().replace(/^['"]|['"]$/g, '');
+}
+
+function normalizeProviderMode(mode) {
+  const v = String(mode || 'auto').toLowerCase();
+  return RATE_PROVIDERS.includes(v) ? v : 'auto';
 }
 
 function getApiCreds() {
@@ -189,59 +209,108 @@ async function fetchCoinGeckoPrice(symbol) {
   return price;
 }
 
-async function getSpotUsdtPrice(symbol) {
-  if (STABLE.has(symbol)) return 1;
+async function fetchPriceFromProvider(symbol, provider, pair) {
+  if (provider === 'bybit') return fetchBybitPrice(pair);
+  if (provider === 'binance') return fetchBinancePrice(pair);
+  if (provider === 'okx') return fetchOkxPrice(symbol);
+  if (provider === 'coingecko') return fetchCoinGeckoPrice(symbol);
+  throw new Error(`Неизвестный провайдер: ${provider}`);
+}
 
+function rememberFetch(provider, symbol) {
+  lastFetchInfo = { provider, symbol, at: Date.now() };
+}
+
+function getLastRateProvider() {
+  return { ...lastFetchInfo };
+}
+
+async function getSpotUsdtPriceDetailed(symbol, providerMode = 'auto', skipCache = false) {
+  if (STABLE.has(symbol)) {
+    rememberFetch('fixed', symbol);
+    return { price: 1, provider: 'fixed' };
+  }
+
+  const mode = normalizeProviderMode(providerMode);
   const pairs = pairCandidates(symbol);
-  const cacheKey = pairs[0];
-  const hit = priceCache.get(cacheKey);
-  if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.price;
+  const cacheKey = `${mode}:${pairs[0]}`;
+  if (!skipCache) {
+    const hit = priceCache.get(cacheKey);
+    if (hit && Date.now() - hit.ts < CACHE_TTL) {
+      rememberFetch(hit.provider, symbol);
+      return { price: hit.price, provider: hit.provider };
+    }
+  }
 
   const errors = [];
+  const providersToTry = mode === 'auto' ? PROVIDER_CHAIN : [mode];
 
-  for (const pair of pairs) {
-    try {
-      const price = await fetchBybitPrice(pair);
-      priceCache.set(cacheKey, { ts: Date.now(), price });
-      return price;
-    } catch (e) {
-      errors.push(e.message);
+  for (const provider of providersToTry) {
+    if (provider === 'okx' || provider === 'coingecko') {
+      try {
+        const price = await fetchPriceFromProvider(symbol, provider, pairs[0]);
+        priceCache.set(cacheKey, { ts: Date.now(), price, provider });
+        rememberFetch(provider, symbol);
+        return { price, provider };
+      } catch (e) {
+        errors.push(e.message);
+      }
+      continue;
     }
 
-    try {
-      const price = await fetchBinancePrice(pair);
-      priceCache.set(cacheKey, { ts: Date.now(), price });
-      return price;
-    } catch (e) {
-      errors.push(e.message);
+    for (const pair of pairs) {
+      try {
+        const price = await fetchPriceFromProvider(symbol, provider, pair);
+        priceCache.set(cacheKey, { ts: Date.now(), price, provider });
+        rememberFetch(provider, symbol);
+        return { price, provider };
+      } catch (e) {
+        errors.push(e.message);
+      }
     }
-  }
-
-  try {
-    const price = await fetchOkxPrice(symbol);
-    priceCache.set(cacheKey, { ts: Date.now(), price });
-    return price;
-  } catch (e) {
-    errors.push(e.message);
-  }
-
-  try {
-    const price = await fetchCoinGeckoPrice(symbol);
-    priceCache.set(cacheKey, { ts: Date.now(), price });
-    return price;
-  } catch (e) {
-    errors.push(e.message);
   }
 
   throw new Error(`Не удалось получить цену ${symbol}: ${errors[errors.length - 1] || 'нет источников'}`);
 }
 
-async function getUsdPrices(symbols) {
+async function getSpotUsdtPrice(symbol, providerMode = 'auto') {
+  const { price } = await getSpotUsdtPriceDetailed(symbol, providerMode);
+  return price;
+}
+
+async function probeProvider(symbol, provider) {
+  const started = Date.now();
+  try {
+    const { price } = await getSpotUsdtPriceDetailed(symbol, provider, true);
+    return {
+      provider,
+      label: PROVIDER_LABELS[provider] || provider,
+      ok: true,
+      price,
+      latencyMs: Date.now() - started,
+    };
+  } catch (e) {
+    return {
+      provider,
+      label: PROVIDER_LABELS[provider] || provider,
+      ok: false,
+      error: e.message,
+      latencyMs: Date.now() - started,
+    };
+  }
+}
+
+async function probeAllProviders(symbol = 'BTC') {
+  const probes = await Promise.all(PROVIDER_CHAIN.map((p) => probeProvider(symbol, p)));
+  return probes;
+}
+
+async function getUsdPrices(symbols, providerMode = 'auto') {
   const out = {};
   const unique = [...new Set(symbols.filter((s) => !['RUB'].includes(s)))];
   await Promise.all(
     unique.map(async (sym) => {
-      out[sym] = await getSpotUsdtPrice(sym);
+      out[sym] = await getSpotUsdtPrice(sym, providerMode);
     })
   );
   return out;
@@ -268,7 +337,15 @@ const DEPOSIT_STATUS = {
 module.exports = {
   STABLE,
   SPOT_PAIR,
+  RATE_PROVIDERS,
+  PROVIDER_LABELS,
+  PROVIDER_CHAIN,
   getSpotUsdtPrice,
+  getSpotUsdtPriceDetailed,
+  getLastRateProvider,
+  probeProvider,
+  probeAllProviders,
+  normalizeProviderMode,
   getUsdPrices,
   queryDeposits,
   DEPOSIT_STATUS,

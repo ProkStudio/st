@@ -1,4 +1,9 @@
-const { getSpotUsdtPrice, STABLE } = require('./bybit');
+const {
+  getSpotUsdtPriceDetailed,
+  STABLE,
+  PROVIDER_LABELS,
+  normalizeProviderMode,
+} = require('./bybit');
 
 const FIAT = new Set(['RUB', 'USD']);
 
@@ -6,43 +11,61 @@ function isFiat(symbol) {
   return FIAT.has(symbol);
 }
 
+function providerLabel(id) {
+  return PROVIDER_LABELS[id] || id;
+}
+
 async function getConversionRate(from, to, settings) {
   const usdRub = parseFloat(settings.usd_rub_rate || '92.5');
+  const providerMode = normalizeProviderMode(settings.rate_provider);
+  const providers = {};
 
-  if (from === to) return 1;
+  if (from === to) return { rate: 1, providers, providerMode };
 
   if (isFiat(from) && isFiat(to)) {
-    if (from === 'USD' && to === 'RUB') return usdRub;
-    if (from === 'RUB' && to === 'USD') return 1 / usdRub;
-    return 1;
+    if (from === 'USD' && to === 'RUB') {
+      providers.usd_rub = 'manual';
+      return { rate: usdRub, providers, providerMode };
+    }
+    if (from === 'RUB' && to === 'USD') {
+      providers.usd_rub = 'manual';
+      return { rate: 1 / usdRub, providers, providerMode };
+    }
+    return { rate: 1, providers, providerMode };
   }
 
   const usdOf = async (sym, amount = 1) => {
     if (sym === 'USD' || sym === 'USDT' || STABLE.has(sym)) return amount;
     if (sym === 'RUB') return amount / usdRub;
-    const p = await getSpotUsdtPrice(sym);
-    return amount * p;
+    const { price, provider } = await getSpotUsdtPriceDetailed(sym, providerMode);
+    providers[sym] = provider;
+    return amount * price;
   };
 
   const unitsOf = async (sym, usd) => {
     if (sym === 'USD' || sym === 'USDT' || STABLE.has(sym)) return usd;
     if (sym === 'RUB') return usd * usdRub;
-    const p = await getSpotUsdtPrice(sym);
-    return usd / p;
+    const { price, provider } = await getSpotUsdtPriceDetailed(sym, providerMode);
+    providers[sym] = provider;
+    return usd / price;
   };
 
   const usdValue = await usdOf(from, 1);
-  return unitsOf(to, usdValue);
+  const rate = await unitsOf(to, usdValue);
+  return { rate, providers, providerMode };
 }
 
 async function convertAmount(from, to, amount, markupPercent, settings) {
   const amt = parseFloat(amount);
   if (!amt || amt <= 0) throw new Error('Некорректная сумма');
 
-  const rawRate = await getConversionRate(from, to, settings);
+  const { rate: rawRate, providers, providerMode } = await getConversionRate(from, to, settings);
   const factor = 1 - parseFloat(markupPercent) / 100;
   const effectiveRate = rawRate * factor;
   const result = amt * effectiveRate;
+
+  const usedProviders = [...new Set(Object.values(providers))];
+  const activeProvider = usedProviders.length === 1 ? usedProviders[0] : usedProviders.join('+');
 
   return {
     from,
@@ -52,7 +75,10 @@ async function convertAmount(from, to, amount, markupPercent, settings) {
     rawRate,
     effectiveRate,
     markupPercent: parseFloat(markupPercent),
-    source: 'bybit',
+    rateProviderMode: providerMode,
+    rateProviders: providers,
+    rateSource: activeProvider,
+    rateSourceLabel: usedProviders.map(providerLabel).join(' + ') || providerLabel(providerMode),
   };
 }
 

@@ -18,6 +18,14 @@ const {
 } = require('../db');
 const { authMiddleware, login, changePassword } = require('../auth');
 const { convertAmount } = require('../rates');
+const {
+  probeAllProviders,
+  getSpotUsdtPriceDetailed,
+  getLastRateProvider,
+  PROVIDER_LABELS,
+  RATE_PROVIDERS,
+  normalizeProviderMode,
+} = require('../bybit');
 
 function createAdminRouter(notifyOrderUpdate) {
   const router = express.Router();
@@ -48,8 +56,43 @@ function createAdminRouter(notifyOrderUpdate) {
         deposit_wallet: getDepositWallet(),
         chat_operator_name: settings.chat_operator_name || 'Bambusito228 Support',
         unread_chats: countUnreadChats(),
+        rate_provider: normalizeProviderMode(settings.rate_provider),
       },
     });
+  });
+
+  router.get('/rate-status', async (_req, res) => {
+    try {
+      const settings = getAllSettings();
+      const mode = normalizeProviderMode(settings.rate_provider);
+      const probes = await probeAllProviders('BTC');
+      let active = null;
+      let activePrice = null;
+      let activeError = null;
+      try {
+        const result = await getSpotUsdtPriceDetailed('BTC', mode);
+        active = result.provider;
+        activePrice = result.price;
+      } catch (e) {
+        activeError = e.message;
+      }
+      res.json({
+        mode,
+        modeLabel: PROVIDER_LABELS[mode] || mode,
+        activeProvider: active,
+        activeProviderLabel: active ? PROVIDER_LABELS[active] || active : null,
+        activePrice,
+        activeError,
+        lastFetch: getLastRateProvider(),
+        probes,
+        providers: RATE_PROVIDERS.map((id) => ({
+          id,
+          label: PROVIDER_LABELS[id] || id,
+        })),
+      });
+    } catch (e) {
+      res.status(502).json({ error: e.message });
+    }
   });
 
   router.get('/settings', (_req, res) => {
@@ -62,6 +105,7 @@ function createAdminRouter(notifyOrderUpdate) {
       order_ttl_minutes: parseInt(s.order_ttl_minutes || '30', 10),
       deposit_wallet: getDepositWallet(),
       chat_operator_name: s.chat_operator_name || 'Bambusito228 Support',
+      rate_provider: normalizeProviderMode(s.rate_provider),
     });
   });
 
@@ -73,6 +117,7 @@ function createAdminRouter(notifyOrderUpdate) {
       order_ttl_minutes,
       deposit_wallet,
       chat_operator_name,
+      rate_provider,
     } = req.body;
     if (markup_percent !== undefined) {
       const v = parseFloat(markup_percent);
@@ -98,6 +143,13 @@ function createAdminRouter(notifyOrderUpdate) {
     }
     if (deposit_wallet !== undefined) setDepositWallet(deposit_wallet);
     if (chat_operator_name) setSetting('chat_operator_name', chat_operator_name);
+    if (rate_provider !== undefined) {
+      const mode = normalizeProviderMode(rate_provider);
+      if (!RATE_PROVIDERS.includes(mode)) {
+        return res.status(400).json({ error: 'Некорректный источник курса' });
+      }
+      setSetting('rate_provider', mode);
+    }
     res.json({ ok: true });
   });
 

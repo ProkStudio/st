@@ -19,6 +19,14 @@ const STATUS_LABELS = {
   cancelled: 'Отменён',
 };
 
+const RATE_MODE_LABELS = {
+  auto: 'Авто',
+  bybit: 'Bybit',
+  binance: 'Binance',
+  okx: 'OKX',
+  coingecko: 'CoinGecko',
+};
+
 async function api(path, opts = {}) {
   const res = await fetch(API + path, {
     ...opts,
@@ -165,6 +173,41 @@ async function loadChatSessions() {
   updateChatBadge(unread);
 }
 
+async function loadRateStatus() {
+  const data = await api('/rate-status');
+  const mode = data.mode || 'auto';
+  const activeLabel = data.activeError
+    ? 'Ошибка'
+    : (data.activeProviderLabel || '—');
+  const activeDetail = data.activeError
+    ? data.activeError
+    : (data.activePrice ? `BTC ≈ $${Number(data.activePrice).toLocaleString('en-US', { maximumFractionDigits: 2 })}` : '');
+
+  $('#rate-active-provider').textContent = activeLabel;
+  $('#rate-active-provider').style.color = data.activeError ? 'var(--red)' : 'var(--green)';
+  $('#stat-rate-source').textContent = activeLabel;
+  $('#stat-rate-mode').textContent = `Режим: ${data.modeLabel || RATE_MODE_LABELS[mode] || mode}`;
+
+  const list = $('#rate-probe-list');
+  if (!list) return;
+
+  const probesHtml = (data.probes || []).map((p) => {
+    const cls = p.ok ? 'is-ok' : 'is-fail';
+    const meta = p.ok
+      ? `$${Number(p.price).toLocaleString('en-US', { maximumFractionDigits: 2 })} · ${p.latencyMs} мс`
+      : esc((p.error || 'недоступен').slice(0, 80));
+    return `
+      <div class="rate-probe-item ${cls}">
+        <strong>${esc(p.label)}</strong>
+        <span class="rate-probe-meta">${meta}</span>
+      </div>`;
+  }).join('');
+
+  list.innerHTML = activeDetail
+    ? `<div class="rate-probe-meta" style="margin-bottom:0.5rem">${esc(activeDetail)}</div>${probesHtml}`
+    : probesHtml;
+}
+
 async function loadDashboard() {
   const data = await api('/dashboard');
   $('#stat-total').textContent = data.stats.total;
@@ -172,6 +215,12 @@ async function loadDashboard() {
   $('#stat-completed').textContent = data.stats.completed;
   $('#stat-fee').textContent = data.settings.markup_percent + '%';
   updateChatBadge(data.settings.unread_chats || 0);
+
+  const rateProvider = data.settings.rate_provider || 'auto';
+  $('#rate-provider-input').value = rateProvider;
+  $('#stat-rate-mode').textContent = `Режим: ${RATE_MODE_LABELS[rateProvider] || rateProvider}`;
+
+  loadRateStatus().catch(() => {});
 
   const orders = await api('/orders?limit=6');
   const recent = $('#recent-orders');
@@ -226,6 +275,7 @@ $$('.nav-item').forEach((btn) => {
     $('#page-title').textContent = titles[btn.dataset.tab];
     refreshIcons();
     if (btn.dataset.tab === 'chat') loadChatSessions();
+    if (btn.dataset.tab === 'settings') loadRateStatus().catch(() => {});
   };
 });
 
@@ -246,6 +296,7 @@ $('#save-all-settings').onclick = async () => {
         order_ttl_minutes: $('#order-ttl-input').value,
         deposit_wallet: $('#deposit-wallet-input').value,
         chat_operator_name: $('#chat-operator-input').value,
+        rate_provider: $('#rate-provider-input').value,
       }),
     });
     const pwd = $('#pwd-new').value;
@@ -282,6 +333,7 @@ $('#chat-reply-form').onsubmit = async (e) => {
 
 $('#refresh-orders').onclick = loadDashboard;
 $('#refresh-chat').onclick = loadChatSessions;
+$('#refresh-rate-status').onclick = () => loadRateStatus().catch((e) => toast(e.message, false));
 
 if (token) {
   showScreen('dashboard');

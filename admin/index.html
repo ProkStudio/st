@@ -70,6 +70,11 @@
               <span class="stat-label">Наценка</span>
               <strong id="stat-fee">0%</strong>
             </article>
+            <article class="stat-card">
+              <span class="stat-label">Источник курса</span>
+              <strong id="stat-rate-source">—</strong>
+              <span class="stat-sub" id="stat-rate-mode">Авто</span>
+            </article>
           </div>
           <div class="panel">
             <div class="panel-head"><h3>Последние ордера</h3></div>
@@ -137,7 +142,34 @@
             </section>
 
             <section class="panel settings-section">
-              <h3><i data-lucide="percent"></i> Наценка от курса Bybit</h3>
+              <h3><i data-lucide="line-chart"></i> Источник курса</h3>
+              <p class="muted">Откуда берётся рыночная цена для крипто-пар. В режиме «Авто» сервер перебирает источники по очереди.</p>
+
+              <div class="rate-status-panel" id="rate-status-panel">
+                <div class="rate-status-head">
+                  <div>
+                    <span class="rate-status-label">Сейчас используется</span>
+                    <strong id="rate-active-provider">—</strong>
+                  </div>
+                  <button type="button" class="btn-ghost btn-sm" id="refresh-rate-status">Проверить</button>
+                </div>
+                <div class="rate-probe-list" id="rate-probe-list"></div>
+              </div>
+
+              <label class="field-block">
+                Режим выбора источника
+                <select id="rate-provider-input">
+                  <option value="auto">Авто — Bybit → Binance → OKX → CoinGecko</option>
+                  <option value="bybit">Только Bybit</option>
+                  <option value="binance">Только Binance</option>
+                  <option value="okx">Только OKX</option>
+                  <option value="coingecko">Только CoinGecko</option>
+                </select>
+              </label>
+            </section>
+
+            <section class="panel settings-section">
+              <h3><i data-lucide="percent"></i> Наценка от рыночного курса</h3>
               <p class="muted">2 = клиент получает на 2% меньше. -5 = на 5% больше рыночного.</p>
               <label class="field-block inline-field">
                 Наценка, %

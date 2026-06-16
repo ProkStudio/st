@@ -372,6 +372,79 @@ th { color: var(--muted); font-weight: 500; font-size: 0.78rem; text-transform: 
 
 .field-block input:focus { border-color: var(--border-strong); }
 
+.field-block select {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+}
+
+.field-block select:focus { border-color: var(--border-strong); }
+
+.stat-sub {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--dim);
+}
+
+.btn-sm { padding: 0.4rem 0.75rem; font-size: 0.8rem; }
+
+.rate-status-panel {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.rate-status-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.rate-status-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+
+#rate-active-provider {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--green);
+}
+
+.rate-probe-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.rate-probe-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.rate-probe-item.is-ok strong { color: var(--green); }
+.rate-probe-item.is-fail strong { color: var(--red); }
+.rate-probe-meta { color: var(--dim); font-size: 0.75rem; white-space: nowrap; }
+
 .inline-field { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .inline-field input { width: 120px !important; margin-top: 0 !important; display: inline-block !important; }
 

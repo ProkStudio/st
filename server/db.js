@@ -65,6 +65,7 @@ const defaults = {
   deposit_wallet: '',
   order_ttl_minutes: '30',
   chat_operator_name: 'Bambusito228 Support',
+  rate_provider: 'auto',
 };
 
 const orderColumns = [
