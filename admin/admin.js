@@ -116,6 +116,12 @@ function updateChatBadge(n) {
   }
 }
 
+function chatSessionHeadline(s) {
+  const seq = s.seq ? `#${s.seq}` : '#—';
+  const order = s.order_id ? `Ордер #${s.order_id}` : 'без ордера';
+  return `${seq} · ${order}`;
+}
+
 function renderChatSessions(sessions) {
   const list = $('#chat-sessions-list');
   if (!sessions.length) {
@@ -125,10 +131,12 @@ function renderChatSessions(sessions) {
   list.innerHTML = sessions.map((s) => `
     <button type="button" class="chat-session-item ${s.id === activeChatId ? 'active' : ''}" data-id="${s.id}">
       <div class="chat-session-top">
-        <strong>${esc(s.country || 'Неизвестно')}</strong>
+        <strong class="chat-session-headline">${esc(chatSessionHeadline(s))}</strong>
         ${s.unread_admin > 0 ? `<span class="chat-unread">${s.unread_admin}</span>` : ''}
       </div>
+      <div class="chat-session-meta">${esc([s.country || 'Неизвестно', s.city].filter(Boolean).join(', '))}</div>
       <div class="chat-session-ip">IP: ${esc(s.ip || '—')}</div>
+      <div class="chat-session-device">${esc(s.device_label || 'Устройство неизвестно')}</div>
       <div class="chat-session-preview">${esc((s.last_preview || '').slice(0, 60))}</div>
       <div class="chat-session-time">${formatDate(s.last_message_at)}</div>
     </button>
@@ -158,9 +166,11 @@ async function openChatSession(id) {
 
   const loc = [data.session.country, data.session.city].filter(Boolean).join(', ');
   $('#chat-thread-meta').innerHTML = `
-    <div><strong>${esc(loc || 'Неизвестная страна')}</strong></div>
+    <div><strong>${esc(chatSessionHeadline(data.session))}</strong></div>
+    <div class="chat-meta-line">${esc(loc || 'Неизвестная страна')}</div>
     <div class="chat-meta-line">IP: <code>${esc(data.session.ip || '—')}</code></div>
-    <div class="chat-meta-line muted">ID: ${esc(data.session.id.slice(0, 8))}…</div>
+    <div class="chat-meta-line muted">${esc(data.session.device_label || 'Устройство неизвестно')}</div>
+    ${data.session.order ? `<div class="chat-meta-line">💱 ${esc(data.session.order.amount_from)} ${esc(data.session.order.from_currency)} → ${Number(data.session.order.amount_to).toFixed(6)} ${esc(data.session.order.to_currency)}</div>` : ''}
   `;
   renderChatMessages(data.messages);
   loadChatSessions();

@@ -266,7 +266,13 @@
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from, to, amountFrom, address }),
+        body: JSON.stringify({
+          from,
+          to,
+          amountFrom,
+          address,
+          chatSessionId: window.getBambusChatSessionId?.() || localStorage.getItem('bambus_chat_session') || '',
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'order_failed');

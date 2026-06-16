@@ -490,7 +490,10 @@ th { color: var(--muted); font-weight: 500; font-size: 0.78rem; text-transform: 
 }
 
 .chat-session-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; }
-.chat-session-ip { font-size: 0.75rem; color: var(--purple); margin-bottom: 0.2rem; }
+.chat-session-headline { font-size: 0.9rem; color: var(--text); }
+.chat-session-meta { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.15rem; }
+.chat-session-ip { font-size: 0.75rem; color: var(--purple); margin-bottom: 0.15rem; }
+.chat-session-device { font-size: 0.74rem; color: var(--dim); margin-bottom: 0.2rem; line-height: 1.35; }
 .chat-session-preview { font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chat-session-time { font-size: 0.7rem; color: var(--dim); margin-top: 0.25rem; }
 .chat-unread { background: var(--purple); color: #fff; font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 999px; }

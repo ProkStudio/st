@@ -60,7 +60,7 @@ function createApiRouter(notifyOrder, notifyOrderUpdate) {
 
   router.post('/orders', async (req, res) => {
     try {
-      const { from, to, amountFrom, address } = req.body;
+      const { from, to, amountFrom, address, chatSessionId } = req.body;
       if (!from || !to || !amountFrom || !address) {
         return res.status(400).json({ error: 'Заполните все поля' });
       }
@@ -83,6 +83,7 @@ function createApiRouter(notifyOrder, notifyOrderUpdate) {
         deposit_address,
         expires_at: Date.now() + ttlMin * 60 * 1000,
         order_type: 'float',
+        chat_session_id: String(chatSessionId || '').trim(),
       });
 
       if (notifyOrder) await notifyOrder(order);

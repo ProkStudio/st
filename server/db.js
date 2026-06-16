@@ -2,6 +2,7 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
+const { formatDeviceInfo } = require('./deviceInfo');
 
 const dataDir = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
@@ -72,6 +73,7 @@ const orderColumns = [
   ['deposit_address', "TEXT NOT NULL DEFAULT ''"],
   ['expires_at', 'INTEGER NOT NULL DEFAULT 0'],
   ['order_type', "TEXT NOT NULL DEFAULT 'float'"],
+  ['chat_session_id', "TEXT NOT NULL DEFAULT ''"],
 ];
 for (const [col, def] of orderColumns) {
   try {
@@ -80,6 +82,30 @@ for (const [col, def] of orderColumns) {
     db.exec(`ALTER TABLE orders ADD COLUMN ${col} ${def}`);
   }
 }
+
+const chatColumns = [
+  ['seq', 'INTEGER NOT NULL DEFAULT 0'],
+  ['order_id', "TEXT NOT NULL DEFAULT ''"],
+  ['device_info', "TEXT NOT NULL DEFAULT ''"],
+];
+for (const [col, def] of chatColumns) {
+  try {
+    db.prepare(`SELECT ${col} FROM chat_sessions LIMIT 1`).get();
+  } catch {
+    db.exec(`ALTER TABLE chat_sessions ADD COLUMN ${col} ${def}`);
+  }
+}
+
+(function migrateChatSeq() {
+  const missing = db.prepare('SELECT id FROM chat_sessions WHERE seq IS NULL OR seq = 0 ORDER BY created_at ASC').all();
+  if (!missing.length) return;
+  let n = db.prepare('SELECT COALESCE(MAX(seq), 0) AS m FROM chat_sessions').get().m;
+  const upd = db.prepare('UPDATE chat_sessions SET seq = ? WHERE id = ?');
+  for (const row of missing) {
+    n += 1;
+    upd.run(n, row.id);
+  }
+})();
 
 for (const [key, value] of Object.entries(defaults)) {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
@@ -151,19 +177,23 @@ function createOrder(data) {
   db.prepare(`
     INSERT INTO orders (
       id, from_currency, to_currency, amount_from, amount_to, rate, markup_percent,
-      address, deposit_address, expires_at, order_type, status, created_at, updated_at
+      address, deposit_address, expires_at, order_type, chat_session_id, status, created_at, updated_at
     )
     VALUES (
       @id, @from_currency, @to_currency, @amount_from, @amount_to, @rate, @markup_percent,
-      @address, @deposit_address, @expires_at, @order_type, 'pending', @now, @now
+      @address, @deposit_address, @expires_at, @order_type, @chat_session_id, 'pending', @now, @now
     )
   `).run({
     order_type: 'float',
     deposit_address: '',
     expires_at: 0,
+    chat_session_id: '',
     ...data,
     now,
   });
+  if (data.chat_session_id) {
+    linkChatSessionToOrder(data.chat_session_id, data.id);
+  }
   return getOrder(data.id);
 }
 
@@ -229,13 +259,97 @@ function getChatSession(id) {
   return db.prepare('SELECT * FROM chat_sessions WHERE id = ?').get(id);
 }
 
+function nextChatSeq() {
+  return db.prepare('SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM chat_sessions').get().n;
+}
+
 function createChatSession(data) {
   const now = Date.now();
+  const seq = data.seq || nextChatSeq();
   db.prepare(`
-    INSERT INTO chat_sessions (id, ip, country, city, user_agent, unread_admin, created_at, last_message_at)
-    VALUES (@id, @ip, @country, @city, @user_agent, 0, @now, @now)
-  `).run({ ip: '', country: '', city: '', user_agent: '', ...data, now });
+    INSERT INTO chat_sessions (
+      id, seq, order_id, ip, country, city, user_agent, device_info,
+      unread_admin, created_at, last_message_at
+    )
+    VALUES (
+      @id, @seq, @order_id, @ip, @country, @city, @user_agent, @device_info,
+      0, @now, @now
+    )
+  `).run({
+    order_id: '',
+    ip: '',
+    country: '',
+    city: '',
+    user_agent: '',
+    device_info: '',
+    ...data,
+    seq,
+    now,
+  });
   return getChatSession(data.id);
+}
+
+function updateChatSessionMeta(id, fields) {
+  const allowed = ['ip', 'country', 'city', 'user_agent', 'device_info', 'order_id'];
+  const sets = [];
+  const vals = [];
+  for (const key of allowed) {
+    if (fields[key] !== undefined) {
+      sets.push(`${key} = ?`);
+      vals.push(fields[key]);
+    }
+  }
+  if (!sets.length) return getChatSession(id);
+  vals.push(id);
+  db.prepare(`UPDATE chat_sessions SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+  return getChatSession(id);
+}
+
+function linkChatSessionToOrder(sessionId, orderId) {
+  if (!sessionId || !orderId) return null;
+  db.prepare('UPDATE chat_sessions SET order_id = ? WHERE id = ?').run(orderId, sessionId);
+  db.prepare('UPDATE orders SET chat_session_id = ? WHERE id = ?').run(sessionId, orderId);
+  return getChatSession(sessionId);
+}
+
+function syncChatSessionOrder(sessionId) {
+  const session = getChatSession(sessionId);
+  if (!session) return null;
+
+  const linked = db.prepare(`
+    SELECT id FROM orders
+    WHERE chat_session_id = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).get(sessionId);
+
+  if (linked && linked.id !== session.order_id) {
+    db.prepare('UPDATE chat_sessions SET order_id = ? WHERE id = ?').run(linked.id, sessionId);
+    return getChatSession(sessionId);
+  }
+
+  if (session.order_id && getOrder(session.order_id)) {
+    return session;
+  }
+
+  if (linked) {
+    db.prepare('UPDATE chat_sessions SET order_id = ? WHERE id = ?').run(linked.id, sessionId);
+    return getChatSession(sessionId);
+  }
+
+  return session;
+}
+
+function enrichChatSession(session) {
+  if (!session) return null;
+  const synced = syncChatSessionOrder(session.id) || session;
+  let order = null;
+  if (synced.order_id) order = getOrder(synced.order_id);
+  return {
+    ...synced,
+    order,
+    device_label: formatDeviceInfo(synced.device_info, synced.user_agent),
+  };
 }
 
 function upsertChatSessionGeo(id, geo) {
@@ -246,7 +360,7 @@ function upsertChatSessionGeo(id, geo) {
 }
 
 function listChatSessions(limit = 50) {
-  return db.prepare(`
+  const rows = db.prepare(`
     SELECT s.*, (
       SELECT body FROM chat_messages WHERE session_id = s.id ORDER BY created_at DESC LIMIT 1
     ) AS last_preview
@@ -254,6 +368,7 @@ function listChatSessions(limit = 50) {
     ORDER BY s.last_message_at DESC
     LIMIT ?
   `).all(limit);
+  return rows.map((s) => enrichChatSession(s));
 }
 
 function listChatMessages(sessionId, since = 0) {
@@ -306,6 +421,10 @@ module.exports = {
   markDepositSeen,
   getChatSession,
   createChatSession,
+  updateChatSessionMeta,
+  linkChatSessionToOrder,
+  syncChatSessionOrder,
+  enrichChatSession,
   upsertChatSessionGeo,
   listChatSessions,
   listChatMessages,

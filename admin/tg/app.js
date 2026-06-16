@@ -298,6 +298,12 @@ async function loadOrders() {
   bindStatusSelects(list);
 }
 
+function chatSessionHeadline(s) {
+  const seq = s.seq ? `#${s.seq}` : '#—';
+  const order = s.order_id ? `Ордер #${s.order_id}` : 'без ордера';
+  return `${seq} · ${order}`;
+}
+
 function renderChatSessions(sessions) {
   const box = $('#chat-sessions');
   if (!sessions.length) {
@@ -307,11 +313,13 @@ function renderChatSessions(sessions) {
   box.innerHTML = sessions.map((s) => `
     <button type="button" class="chat-item" data-id="${esc(s.id)}">
       <div class="chat-item-top">
-        <strong>${esc(s.country || 'Неизвестно')}</strong>
+        <strong>${esc(chatSessionHeadline(s))}</strong>
         ${s.unread_admin > 0 ? `<span class="chat-unread">${s.unread_admin}</span>` : ''}
       </div>
-      <div class="chat-preview">${esc((s.last_preview || '').slice(0, 80))}</div>
-      <div class="chat-time">${formatDate(s.last_message_at)} · ${esc(s.ip || '—')}</div>
+      <div class="chat-preview">${esc([s.country || 'Неизвестно', s.city].filter(Boolean).join(', '))}</div>
+      <div class="chat-device">${esc(s.device_label || 'Устройство неизвестно')}</div>
+      <div class="chat-preview">${esc((s.last_preview || '').slice(0, 70))}</div>
+      <div class="chat-time">IP: ${esc(s.ip || '—')} · ${formatDate(s.last_message_at)}</div>
     </button>
   `).join('');
 
@@ -344,8 +352,10 @@ async function openChatOverlay(id) {
   const data = await api(`/chat/sessions/${id}`);
   const loc = [data.session.country, data.session.city].filter(Boolean).join(', ');
   $('#chat-overlay-meta').innerHTML = `
-    <strong>${esc(loc || 'Посетитель')}</strong>
-    <span>IP: ${esc(data.session.ip || '—')}</span>
+    <strong>${esc(chatSessionHeadline(data.session))}</strong>
+    <span>${esc(loc || 'Посетитель')} · IP: ${esc(data.session.ip || '—')}</span>
+    <span>${esc(data.session.device_label || 'Устройство неизвестно')}</span>
+    ${data.session.order ? `<span>💱 ${esc(data.session.order.amount_from)} ${esc(data.session.order.from_currency)} → ${Number(data.session.order.amount_to).toFixed(6)} ${esc(data.session.order.to_currency)}</span>` : ''}
   `;
   renderChatMessages(data.messages);
   $('#chat-overlay').classList.remove('hidden');

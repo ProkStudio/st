@@ -356,9 +356,15 @@ function createTelegramBot() {
 
       notifyChatMessage = async (session, msg) => {
         const loc = [session.country, session.city].filter(Boolean).join(', ');
+        const { formatDeviceInfo } = require('../deviceInfo');
+        const deviceLine = formatDeviceInfo(session.device_info, session.user_agent);
+        const orderLine = session.order_id
+          ? `📦 Ордер: <b>#${session.order_id}</b>`
+          : '📦 Ордер: <i>ещё не создан</i>';
         await notifyAdmins(
-          `💬 <b>Новое сообщение в чате</b>\n` +
-            `🌍 ${loc || '—'} | IP: <code>${session.ip || '—'}</code>\n\n` +
+          `💬 <b>Диалог #${session.seq || '—'}</b> · ${orderLine}\n` +
+            `🌍 ${loc || '—'} | IP: <code>${session.ip || '—'}</code>\n` +
+            `📱 ${deviceLine}\n\n` +
             `${msg.body}`
         );
       };

@@ -11,6 +11,7 @@ const {
   stats,
   listChatSessions,
   getChatSession,
+  enrichChatSession,
   listChatMessages,
   addChatMessage,
   markChatSessionRead,
@@ -244,7 +245,7 @@ function createAdminRouter(notifyOrderUpdate) {
   });
 
   router.get('/chat/sessions/:id', (req, res) => {
-    const session = getChatSession(req.params.id);
+    const session = enrichChatSession(getChatSession(req.params.id));
     if (!session) return res.status(404).json({ error: 'not_found' });
     markChatSessionRead(req.params.id);
     res.json({ session, messages: listChatMessages(req.params.id) });

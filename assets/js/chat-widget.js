@@ -1,5 +1,16 @@
 (function () {
   const STORAGE_KEY = 'bambus_chat_session';
+
+  function collectDevice() {
+    return {
+      ua: navigator.userAgent,
+      platform: navigator.platform || '',
+      language: navigator.language || '',
+      screen: `${window.screen?.width || 0}x${window.screen?.height || 0}`,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+    };
+  }
+
   let sessionId = localStorage.getItem(STORAGE_KEY);
   let config = { operatorName: 'Bambusito228 Support', statusText: 'Мы отвечаем сразу же' };
   let lastTs = 0;
@@ -40,7 +51,7 @@
     const res = await fetch('/api/chat/session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId }),
+      body: JSON.stringify({ sessionId, device: collectDevice() }),
     });
     const data = await res.json();
     sessionId = data.sessionId;
@@ -61,7 +72,7 @@
     const res = await fetch('/api/chat/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, text }),
+      body: JSON.stringify({ sessionId, text, device: collectDevice() }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Ошибка отправки');
@@ -145,4 +156,6 @@
     .then((r) => r.json())
     .then((c) => { config = { ...config, ...c }; })
     .finally(buildWidget);
+
+  window.getBambusChatSessionId = () => sessionId || localStorage.getItem(STORAGE_KEY);
 })();
