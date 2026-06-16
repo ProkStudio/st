@@ -41,6 +41,7 @@ function createApiRouter(notifyOrder, notifyOrderUpdate) {
       }
       res.json(payload);
     } catch (e) {
+      console.error(`price error ${req.query.from}->${req.query.to}:`, e.message);
       res.status(502).json({ error: e.message || 'rate_unavailable' });
     }
   });

@@ -23,19 +23,24 @@ function formatDeposit(d) {
 }
 
 function startBybitDepositWatcher(notifyAdmins) {
-  if (!process.env.BYBIT_API_KEY || !process.env.BYBIT_API_SECRET) {
+  const key = String(process.env.BYBIT_API_KEY || '').trim().replace(/^['"]|['"]$/g, '');
+  const secret = String(process.env.BYBIT_API_SECRET || '').trim().replace(/^['"]|['"]$/g, '');
+  if (!key || !secret) {
     console.log('⚠️  Bybit API не задан — мониторинг депозитов отключён');
     return;
   }
   if (!notifyAdmins) return;
 
   let running = false;
+  let failures = 0;
+  let timer = null;
 
   async function poll() {
     if (running) return;
     running = true;
     try {
       const rows = await queryDeposits(50);
+      failures = 0;
       for (const d of rows) {
         const id = String(d.id || d.txID || `${d.coin}-${d.amount}-${d.createTime}`);
         if (isDepositSeen(id)) continue;
@@ -45,14 +50,19 @@ function startBybitDepositWatcher(notifyAdmins) {
         }
       }
     } catch (e) {
+      failures += 1;
       console.error('Bybit deposit poll error:', e.message);
+      if (failures >= 5) {
+        if (timer) clearInterval(timer);
+        console.error('⚠️  Bybit deposit watcher остановлен после 5 ошибок. Проверьте BYBIT_API_KEY/BYBIT_API_SECRET в Railway.');
+      }
     } finally {
       running = false;
     }
   }
 
   poll();
-  setInterval(poll, POLL_MS);
+  timer = setInterval(poll, POLL_MS);
   console.log('👀 Bybit deposit watcher started (every 30s)');
 }
 

@@ -187,10 +187,19 @@
     try {
       const q = new URLSearchParams({ from, to, amount: String(amount || 1) });
       const res = await fetch(`/api/price?${q}`, { signal: rateAbort.signal });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'rate_error');
+      const raw = await res.text();
+      let data = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error('Сервер вернул некорректный ответ');
+      }
+      if (!res.ok) throw new Error(data.error || `Ошибка курса (${res.status})`);
 
       const rate = data[to];
+      if (!Number.isFinite(Number(rate)) || Number(rate) <= 0) {
+        throw new Error('Курс не получен от сервера');
+      }
       if (amount > 0) {
         const out = data.amountTo != null ? data.amountTo : amount * rate;
         els.amountTo.value = formatOut(Math.round(out * PRECISION) / PRECISION, to);
@@ -198,10 +207,12 @@
         els.amountTo.value = '0';
       }
       els.rateText.textContent = `1 ${from} ≈ ${formatOut(rate, to)} ${to}`;
+      els.rateHint.textContent = '';
     } catch (e) {
       if (e.name !== 'AbortError') {
         els.amountTo.value = '—';
         els.rateText.textContent = 'Курс временно недоступен';
+        els.rateHint.textContent = e.message || '';
       }
     } finally {
       setLoading(false);
