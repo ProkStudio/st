@@ -21,6 +21,87 @@ let pollTimer = null;
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function readInitDataFromHash() {
+  const hash = window.location.hash?.slice(1);
+  if (!hash) return '';
+
+  const params = new URLSearchParams(hash);
+  const packed = params.get('tgWebAppData');
+  if (packed) {
+    try {
+      return decodeURIComponent(packed);
+    } catch {
+      return packed;
+    }
+  }
+
+  if (hash.includes('user=') && hash.includes('hash=')) {
+    return hash;
+  }
+  return '';
+}
+
+function readInitDataFromSearch() {
+  const qs = window.location.search?.slice(1);
+  if (!qs || !qs.includes('user=') || !qs.includes('hash=')) return '';
+  return qs;
+}
+
+function buildInitDataFromUnsafe(unsafe) {
+  if (!unsafe?.user?.id || !unsafe?.auth_date || !unsafe?.hash) return '';
+  const entries = [];
+  if (unsafe.query_id != null) entries.push(['query_id', String(unsafe.query_id)]);
+  entries.push(['user', JSON.stringify(unsafe.user)]);
+  if (unsafe.receiver) entries.push(['receiver', JSON.stringify(unsafe.receiver)]);
+  if (unsafe.chat) entries.push(['chat', JSON.stringify(unsafe.chat)]);
+  if (unsafe.chat_type) entries.push(['chat_type', String(unsafe.chat_type)]);
+  if (unsafe.chat_instance != null) entries.push(['chat_instance', String(unsafe.chat_instance)]);
+  if (unsafe.start_param) entries.push(['start_param', String(unsafe.start_param)]);
+  if (unsafe.can_send_after != null) entries.push(['can_send_after', String(unsafe.can_send_after)]);
+  entries.push(['auth_date', String(unsafe.auth_date)]);
+  entries.sort(([a], [b]) => a.localeCompare(b));
+  const qs = new URLSearchParams();
+  for (const [k, v] of entries) qs.set(k, v);
+  qs.set('hash', String(unsafe.hash));
+  return qs.toString();
+}
+
+function currentInitData() {
+  const wa = window.Telegram?.WebApp;
+  if (wa?.initData) return wa.initData;
+  const fromHash = readInitDataFromHash();
+  if (fromHash) return fromHash;
+  const fromSearch = readInitDataFromSearch();
+  if (fromSearch) return fromSearch;
+  return buildInitDataFromUnsafe(wa?.initDataUnsafe);
+}
+
+async function resolveTelegramInitData(maxWaitMs = 1200) {
+  const wa = window.Telegram?.WebApp;
+  const isDesktop = ['tdesktop', 'macos', 'web', 'weba', 'unigram'].includes(wa?.platform);
+  const deadline = Date.now() + (isDesktop ? Math.max(maxWaitMs, 2500) : maxWaitMs);
+  while (Date.now() < deadline) {
+    const initData = currentInitData();
+    if (initData) return initData;
+    window.Telegram?.WebApp?.ready?.();
+    await sleep(100);
+  }
+  return currentInitData();
+}
+
+function isInsideTelegram() {
+  const wa = window.Telegram?.WebApp;
+  if (!wa) return false;
+  if (wa.platform && wa.platform !== 'unknown') return true;
+  if (currentInitData()) return true;
+  if (wa.initDataUnsafe?.user?.id) return true;
+  return false;
+}
+
 function esc(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -105,15 +186,23 @@ async function api(path, opts = {}) {
 }
 
 async function authenticate() {
-  if (!tg?.initData) {
+  if (!isInsideTelegram()) {
     showDenied('Откройте бота в Telegram → Menu (≡) внизу → «🎛 Админка»');
+    return false;
+  }
+
+  const initData = await resolveTelegramInitData();
+  if (!initData) {
+    showDenied(
+      'Telegram Desktop не передал данные входа. Закройте окно, обновите Telegram до последней версии и откройте снова через Menu → «🎛 Админка».'
+    );
     return false;
   }
 
   const res = await fetch(`${API}/tg-auth`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: tg.initData }),
+    body: JSON.stringify({ initData }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -410,6 +499,7 @@ $('#chat-form').addEventListener('submit', async (e) => {
 (async function boot() {
   initTelegramUi();
   try {
+    await sleep(50);
     const ok = await authenticate();
     if (!ok) return;
     showApp();
