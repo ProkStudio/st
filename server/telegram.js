@@ -2,6 +2,7 @@ const { Bot, Keyboard } = require('grammy');
 const { resolveTelegramFetch } = require('./telegramProxy');
 const { getMiniAppUrl } = require('./telegramWebApp');
 const { shouldNotify } = require('./settings');
+const { formatDeviceInfo } = require('./deviceInfo');
 const {
   getAllSettings,
   setSetting,
@@ -163,7 +164,6 @@ function createTelegramBot() {
       }
     }
     const loc = [session.country, session.city].filter(Boolean).join(', ');
-    const { formatDeviceInfo } = require('../deviceInfo');
     const deviceLine = escapeTelegramHtml(formatDeviceInfo(session.device_info, session.user_agent));
     const orderLine = session.order_id
       ? `📦 Ордер: <b>#${escapeTelegramHtml(session.order_id)}</b>`
