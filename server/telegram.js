@@ -140,22 +140,25 @@ function createTelegramBot() {
   }
 
   let bot = null;
-  let botReady = false;
+  let canNotify = false;
   let notifyAdmins = noop;
   let notifyNewOrder = noop;
   let notifyOrderUpdate = noop;
   let notifyChatMessage = noop;
 
   const adminIds = parseAdminIds();
+  if (!adminIds.length) {
+    console.warn('⚠️  TELEGRAM_ADMIN_IDS пуст — уведомления в Telegram отключены');
+  }
 
   notifyChatMessage = async (session, msg) => {
     if (!shouldNotify('notif_chat_message')) return;
-    if (!botReady) {
-      for (let i = 0; i < 10 && !botReady; i += 1) {
+    if (!canNotify) {
+      for (let i = 0; i < 60 && !canNotify; i += 1) {
         await new Promise((r) => setTimeout(r, 500));
       }
-      if (!botReady) {
-        console.error('Chat TG notify skipped: bot not ready');
+      if (!canNotify) {
+        console.error('Chat TG notify skipped: Telegram sender not ready');
         return;
       }
     }
@@ -171,7 +174,8 @@ function createTelegramBot() {
       `💬 <b>Диалог #${escapeTelegramHtml(session.seq || '—')}</b> · ${orderLine}\n` +
         `🌍 ${escapeTelegramHtml(loc || '—')} | IP: <code>${escapeTelegramHtml(session.ip || '—')}</code>\n` +
         `📱 ${deviceLine}\n\n` +
-        body
+        body,
+      { plain: true }
     );
   };
 
@@ -371,21 +375,18 @@ function createTelegramBot() {
       }
 
       notifyAdmins = async (text, extra = {}) => {
+        if (!adminIds.length) return;
+        const plainMode = !!extra.plain;
         for (const id of adminIds) {
+          const opts = { parse_mode: 'HTML', disable_web_page_preview: true };
+          if (!plainMode) opts.reply_markup = extra.reply_markup ?? mainKeyboard();
           try {
-            await bot.api.sendMessage(id, text, {
-              parse_mode: 'HTML',
-              ...extra,
-              reply_markup: extra.reply_markup ?? mainKeyboard(),
-            });
+            await bot.api.sendMessage(id, text, opts);
           } catch (e) {
             console.error('TG notify error', id, e.message);
             try {
-              const plain = text.replace(/<[^>]*>/g, '');
-              await bot.api.sendMessage(id, plain, {
-                ...extra,
-                reply_markup: extra.reply_markup ?? mainKeyboard(),
-              });
+              const stripped = text.replace(/<[^>]*>/g, '');
+              await bot.api.sendMessage(id, stripped, { disable_web_page_preview: true });
             } catch (e2) {
               console.error('TG notify fallback error', id, e2.message);
             }
@@ -399,6 +400,7 @@ function createTelegramBot() {
       };
 
       notifyOrderUpdate = noop;
+      canNotify = true;
 
       bot.command('start', async (ctx) => {
         if (!isAdmin(ctx)) {
@@ -515,9 +517,12 @@ function createTelegramBot() {
 
       bot.catch((err) => console.error('Telegram bot error:', err));
 
-      bot.start();
-      botReady = true;
-      console.log(`🤖 Telegram bot @${me.username} запущен (admins: ${adminIds.join(', ')})`);
+      try {
+        bot.start();
+        console.log(`🤖 Telegram bot @${me.username} polling (admins: ${adminIds.join(', ')})`);
+      } catch (e) {
+        console.error('Telegram polling не запустился (исходящие уведомления работают):', e.message);
+      }
     } catch (e) {
       console.error('❌ Telegram bot не запустился:', e.message);
     }

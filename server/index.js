@@ -10,17 +10,17 @@ const { createChatRouter } = require('./routes/chat');
 const PORT = process.env.PORT || 3000;
 const root = path.join(__dirname, '..');
 
-const { notifyAdmins, notifyNewOrder, notifyOrderUpdate, notifyChatMessage } = createTelegramBot();
-startBybitDepositWatcher(notifyAdmins);
+const tg = createTelegramBot();
+startBybitDepositWatcher(() => tg.notifyAdmins);
 
 const app = express();
 app.set('trust proxy', true);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use('/api', createApiRouter(notifyNewOrder, notifyOrderUpdate));
-app.use('/api/chat', createChatRouter(notifyChatMessage));
-app.use('/api/admin', createAdminRouter(notifyOrderUpdate, notifyAdmins));
+app.use('/api', createApiRouter((...args) => tg.notifyNewOrder(...args), (...args) => tg.notifyOrderUpdate(...args)));
+app.use('/api/chat', createChatRouter((...args) => tg.notifyChatMessage(...args)));
+app.use('/api/admin', createAdminRouter((...args) => tg.notifyOrderUpdate(...args), (...args) => tg.notifyAdmins(...args)));
 
 app.use(express.static(root));
 

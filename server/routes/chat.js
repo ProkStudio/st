@@ -109,7 +109,7 @@ function createChatRouter(notifyChatMessage) {
         try {
           await notifyChatMessage(session, msg);
         } catch (e) {
-          console.error('Chat TG notify failed:', e.message);
+          console.error('Chat TG notify failed:', sessionId, e.message);
         }
       }
 
