@@ -71,6 +71,8 @@ const defaults = {
   chat_welcome_message: 'Здравствуйте! Чем можем помочь?',
   chat_offline_message: 'Оператор ответит в ближайшее время.',
   chat_work_hours: '09:00-21:00',
+  chat_work_start: '09:00',
+  chat_work_end: '21:00',
   chat_show_online: '1',
   rate_provider: 'auto',
   rate_refresh_sec: '60',
@@ -78,6 +80,9 @@ const defaults = {
   exchange_max_usd: '50000',
   maintenance_mode: '0',
   maintenance_message: 'Обмен временно приостановлен. Попробуйте позже.',
+  maintenance_schedule_enabled: '0',
+  maintenance_schedule_start: '02:00',
+  maintenance_schedule_end: '08:00',
   contact_telegram: '',
   contact_email: '',
   rules_text: '',
@@ -133,6 +138,22 @@ for (const [key, value] of Object.entries(defaults)) {
     db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run(key, value);
   }
 }
+
+(function migrateSettingsCleanup() {
+  const email = db.prepare("SELECT value FROM settings WHERE key = 'contact_email'").get();
+  if (email && /^#[0-9a-fA-F]{6}$/i.test(String(email.value).trim())) {
+    db.prepare("UPDATE settings SET value = '' WHERE key = 'contact_email'").run();
+  }
+  const hasStart = db.prepare("SELECT 1 FROM settings WHERE key = 'chat_work_start'").get();
+  if (!hasStart) {
+    const legacy = db.prepare("SELECT value FROM settings WHERE key = 'chat_work_hours'").get();
+    const m = String(legacy?.value || '09:00-21:00').match(/^(\d{1,2}:\d{2})-(\d{1,2}:\d{2})$/);
+    const start = m ? m[1] : '09:00';
+    const end = m ? m[2] : '21:00';
+    db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('chat_work_start', ?)").run(start);
+    db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('chat_work_end', ?)").run(end);
+  }
+})();
 
 const adminHash = db.prepare("SELECT value FROM settings WHERE key = 'admin_password_hash'").get();
 if (!adminHash) {

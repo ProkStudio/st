@@ -257,7 +257,8 @@ function fillSettingsForm(st) {
   $('#chat-operator-input').value = st.chat_operator_name || '';
   $('#chat-welcome-input').value = st.chat_welcome_message || '';
   $('#chat-offline-input').value = st.chat_offline_message || '';
-  $('#chat-hours-input').value = st.chat_work_hours || '09:00-21:00';
+  $('#chat-work-start').value = st.chat_work_start || '09:00';
+  $('#chat-work-end').value = st.chat_work_end || '21:00';
   $('#chat-online-input').checked = !!st.chat_show_online;
   $('#notif-new-order').checked = !!st.notif_new_order;
   $('#notif-chat').checked = !!st.notif_chat_message;
@@ -276,6 +277,15 @@ function fillSettingsForm(st) {
   $('#maintenance-mode-input').checked = !!st.maintenance_mode;
   $('#maintenance-mode-input').dataset.wasOn = st.maintenance_mode ? '1' : '';
   $('#maintenance-msg-input').value = st.maintenance_message || '';
+  $('#maintenance-schedule-enabled').checked = !!st.maintenance_schedule_enabled;
+  $('#maintenance-schedule-start').value = st.maintenance_schedule_start || '02:00';
+  $('#maintenance-schedule-end').value = st.maintenance_schedule_end || '08:00';
+  const hint = $('#maintenance-effective-hint');
+  if (hint) {
+    hint.textContent = st.maintenance_effective
+      ? 'Сейчас обмен для клиентов заблокирован (ручной режим или расписание).'
+      : 'Сейчас обмен для клиентов доступен.';
+  }
   $('#admin-username-display').textContent = st.admin_username || 'admin';
   $('#stat-rate-mode').textContent = `Режим: ${RATE_MODE_LABELS[st.rate_provider] || st.rate_provider}`;
 }
@@ -288,7 +298,9 @@ function updateQuickCards(st) {
   $('#quick-wallet').textContent = w ? `…${w.slice(-8)}` : 'не задан';
   const maint = !!st.maintenance_mode;
   $('#quick-maintenance').checked = maint;
-  $('#quick-maintenance-label').textContent = maint ? 'Вкл' : 'Выкл';
+  $('#quick-maintenance-label').textContent = st.maintenance_effective
+    ? (maint ? 'Вкл' : 'По расписанию')
+    : 'Выкл';
 }
 
 function collectSectionPayload(section) {
@@ -314,7 +326,8 @@ function collectSectionPayload(section) {
         chat_operator_name: $('#chat-operator-input').value,
         chat_welcome_message: $('#chat-welcome-input').value,
         chat_offline_message: $('#chat-offline-input').value,
-        chat_work_hours: $('#chat-hours-input').value,
+        chat_work_start: $('#chat-work-start').value,
+        chat_work_end: $('#chat-work-end').value,
         chat_show_online: $('#chat-online-input').checked,
       };
     case 'notifications':
@@ -336,6 +349,9 @@ function collectSectionPayload(section) {
         faq_text: $('#faq-text-input').value,
         maintenance_mode: $('#maintenance-mode-input').checked,
         maintenance_message: $('#maintenance-msg-input').value,
+        maintenance_schedule_enabled: $('#maintenance-schedule-enabled').checked,
+        maintenance_schedule_start: $('#maintenance-schedule-start').value,
+        maintenance_schedule_end: $('#maintenance-schedule-end').value,
       };
     default:
       return {};

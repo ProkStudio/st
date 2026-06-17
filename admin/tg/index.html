@@ -54,6 +54,7 @@
           <button type="button" class="tg-pill" data-tg-settings="wallet">Кошелёк</button>
           <button type="button" class="tg-pill" data-tg-settings="rates">Курсы</button>
           <button type="button" class="tg-pill" data-tg-settings="chat">Чат</button>
+          <button type="button" class="tg-pill" data-tg-settings="schedule">Расписание</button>
           <button type="button" class="tg-pill" data-tg-settings="order">Ордер</button>
         </nav>
 
@@ -93,6 +94,22 @@
           <div class="card">
             <label class="field">Имя в чате<input type="text" id="chat-operator"></label>
             <label class="field">Приветствие<textarea id="chat-welcome" rows="2"></textarea></label>
+          </div>
+        </div>
+
+        <div class="tg-settings-screen" data-tg-screen="schedule">
+          <div class="card">
+            <h2>Часы поддержки</h2>
+            <p class="hint">Москва. На сайте «офлайн» вне окна. Telegram-уведомления — 24/7.</p>
+            <label class="field">Начало<input type="time" id="chat-work-start" step="60"></label>
+            <label class="field">Конец<input type="time" id="chat-work-end" step="60"></label>
+          </div>
+          <div class="card">
+            <h2>Техрежим по расписанию</h2>
+            <label class="field toggle-field"><input type="checkbox" id="maintenance-schedule-enabled"> Пауза ежедневно</label>
+            <label class="field">Пауза с<input type="time" id="maintenance-schedule-start" step="60"></label>
+            <label class="field">Пауза до<input type="time" id="maintenance-schedule-end" step="60"></label>
+            <p class="hint">Ручной техрежим — в разделе «Быстрое» (имеет приоритет над расписанием).</p>
           </div>
         </div>
 

@@ -237,7 +237,11 @@
                 <label class="field-block">Имя оператора<input type="text" id="chat-operator-input"></label>
                 <label class="field-block">Приветствие<textarea id="chat-welcome-input" rows="2"></textarea></label>
                 <label class="field-block">Сообщение вне часов работы<textarea id="chat-offline-input" rows="2"></textarea></label>
-                <label class="field-block inline-field">Часы работы<input type="text" id="chat-hours-input" placeholder="09:00-21:00"></label>
+                <div class="time-range-row">
+                  <label class="field-block">Начало работы<input type="time" id="chat-work-start" step="60"></label>
+                  <label class="field-block">Конец работы<input type="time" id="chat-work-end" step="60"></label>
+                </div>
+                <p class="muted">Часовой пояс: Москва. Вне этого окна на сайте статус «офлайн». Уведомления в Telegram — всегда.</p>
                 <label class="field-block toggle-field"><input type="checkbox" id="chat-online-input"> Показывать статус «онлайн»</label>
               </div>
               <div class="settings-actions"><button type="button" class="btn-primary save-section" data-section="chat">Сохранить чат</button></div>
@@ -246,7 +250,7 @@
             <section class="settings-panel" data-settings-panel="notifications">
               <div class="panel settings-section">
                 <h3><i data-lucide="bell"></i> Telegram-уведомления</h3>
-                <p class="muted">Кому слать — список TELEGRAM_ADMIN_IDS в Railway.</p>
+                <p class="muted">Кому слать — список TELEGRAM_ADMIN_IDS в Railway. Сообщения приходят <strong>круглосуточно</strong>, независимо от часов работы на сайте.</p>
                 <label class="field-block toggle-field"><input type="checkbox" id="notif-new-order"> Новый ордер</label>
                 <label class="field-block toggle-field"><input type="checkbox" id="notif-chat"> Сообщение в чате</label>
                 <label class="field-block toggle-field"><input type="checkbox" id="notif-bybit"> Депозит на Bybit</label>
@@ -261,17 +265,24 @@
                 <h3><i data-lucide="palette"></i> Брендинг и тексты</h3>
                 <label class="field-block">Название сайта<input type="text" id="site-name-input"></label>
                 <label class="field-block">Слоган<input type="text" id="site-tagline-input"></label>
-                <label class="field-block color-field">Акцент <input type="color" id="accent-color-input"><input type="text" id="accent-hex-input" maxlength="7" placeholder="#22c55e"></label>
-                <label class="field-block">Telegram<input type="text" id="contact-tg-input" placeholder="@username"></label>
-                <label class="field-block">Email<input type="email" id="contact-email-input"></label>
+                <label class="field-block color-field">Акцент<input type="color" id="accent-color-input" autocomplete="off"><input type="text" id="accent-hex-input" maxlength="7" placeholder="#22c55e" autocomplete="off"></label>
+                <label class="field-block">Telegram<input type="text" id="contact-tg-input" placeholder="@username" autocomplete="off"></label>
+                <label class="field-block">Email<input type="text" id="contact-email-input" inputmode="email" placeholder="info@example.com" autocomplete="off"></label>
                 <label class="field-block">Правила обмена<textarea id="rules-text-input" rows="4"></textarea></label>
                 <label class="field-block">FAQ (текст)<textarea id="faq-text-input" rows="4"></textarea></label>
               </div>
               <div class="panel settings-section">
                 <h3><i data-lucide="construction"></i> Техрежим</h3>
                 <p class="muted">Клиенты не смогут создавать ордера. Админка работает.</p>
-                <label class="field-block toggle-field"><input type="checkbox" id="maintenance-mode-input"> Обмен приостановлен</label>
+                <label class="field-block toggle-field"><input type="checkbox" id="maintenance-mode-input"> Обмен приостановлен (вручную)</label>
                 <label class="field-block">Сообщение на сайте<textarea id="maintenance-msg-input" rows="2"></textarea></label>
+                <label class="field-block toggle-field"><input type="checkbox" id="maintenance-schedule-enabled"> Пауза по расписанию (ежедневно)</label>
+                <div class="time-range-row">
+                  <label class="field-block">Пауза с<input type="time" id="maintenance-schedule-start" step="60"></label>
+                  <label class="field-block">Пауза до<input type="time" id="maintenance-schedule-end" step="60"></label>
+                </div>
+                <p class="muted">Расписание по Москве. Если включён ручной техрежим — он важнее. Окно через полночь: например 22:00 → 09:00.</p>
+                <p class="muted" id="maintenance-effective-hint"></p>
               </div>
               <div class="settings-actions"><button type="button" class="btn-primary save-section" data-section="site">Сохранить сайт</button></div>
             </section>

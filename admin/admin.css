@@ -664,3 +664,23 @@ th { color: var(--muted); font-weight: 500; font-size: 0.78rem; text-transform: 
 .color-field input[type="text"] { width: 100px !important; margin-top: 0 !important; }
 
 .settings-soon { padding: 0 0 2rem; font-size: 0.82rem; }
+
+.time-range-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.time-range-row input[type="time"] {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+}

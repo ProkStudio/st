@@ -77,38 +77,47 @@ function createChatRouter(notifyChatMessage) {
   });
 
   router.post('/messages', async (req, res) => {
-    const { sessionId, text, device } = req.body || {};
-    const body = String(text || '').trim();
-    if (!sessionId || !body) {
-      return res.status(400).json({ error: 'Укажите сообщение' });
+    try {
+      const { sessionId, text, device } = req.body || {};
+      const body = String(text || '').trim();
+      if (!sessionId || !body) {
+        return res.status(400).json({ error: 'Укажите сообщение' });
+      }
+
+      let session = getChatSession(sessionId);
+      if (!session) {
+        const ip = getClientIp(req);
+        const geo = await lookupGeo(ip);
+        const ua = String(req.headers['user-agent'] || '').slice(0, 300);
+        const deviceInfo = mergeDeviceInfo({}, { ...device, ua: device?.ua || ua });
+        session = createChatSession({
+          id: sessionId,
+          ip: geo.ip,
+          country: geo.country,
+          city: geo.city,
+          user_agent: ua,
+          device_info: JSON.stringify(deviceInfo),
+        });
+      } else {
+        session = await touchSession(req, session, device);
+      }
+
+      const msg = addChatMessage(sessionId, 'visitor', body.slice(0, 2000));
+      session = enrichChatSession(getChatSession(sessionId));
+
+      if (notifyChatMessage) {
+        try {
+          await notifyChatMessage(session, msg);
+        } catch (e) {
+          console.error('Chat TG notify failed:', e.message);
+        }
+      }
+
+      res.status(201).json({ message: msg });
+    } catch (e) {
+      console.error('Chat message error:', e);
+      res.status(500).json({ error: 'Не удалось отправить сообщение' });
     }
-
-    let session = getChatSession(sessionId);
-    if (!session) {
-      const ip = getClientIp(req);
-      const geo = await lookupGeo(ip);
-      const ua = String(req.headers['user-agent'] || '').slice(0, 300);
-      const deviceInfo = mergeDeviceInfo({}, { ...device, ua: device?.ua || ua });
-      session = createChatSession({
-        id: sessionId,
-        ip: geo.ip,
-        country: geo.country,
-        city: geo.city,
-        user_agent: ua,
-        device_info: JSON.stringify(deviceInfo),
-      });
-    } else {
-      session = await touchSession(req, session, device);
-    }
-
-    const msg = addChatMessage(sessionId, 'visitor', body.slice(0, 2000));
-    session = enrichChatSession(getChatSession(sessionId));
-
-    if (notifyChatMessage) {
-      await notifyChatMessage(session, msg);
-    }
-
-    res.status(201).json({ message: msg });
   });
 
   return router;

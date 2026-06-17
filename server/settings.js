@@ -1,4 +1,4 @@
-const { getSetting, setSetting, getAllSettings, getDepositWallet } = require('./db');
+const { getSetting, setSetting } = require('./db');
 
 const SETTING_DEFAULTS = {
   markup_percent: '1.5',
@@ -12,6 +12,8 @@ const SETTING_DEFAULTS = {
   chat_welcome_message: 'Здравствуйте! Чем можем помочь?',
   chat_offline_message: 'Оператор ответит в ближайшее время.',
   chat_work_hours: '09:00-21:00',
+  chat_work_start: '09:00',
+  chat_work_end: '21:00',
   chat_show_online: '1',
   rate_provider: 'auto',
   rate_refresh_sec: '60',
@@ -19,6 +21,9 @@ const SETTING_DEFAULTS = {
   exchange_max_usd: '50000',
   maintenance_mode: '0',
   maintenance_message: 'Обмен временно приостановлен. Попробуйте позже.',
+  maintenance_schedule_enabled: '0',
+  maintenance_schedule_start: '02:00',
+  maintenance_schedule_end: '08:00',
   contact_telegram: '',
   contact_email: '',
   rules_text: '',
@@ -30,6 +35,8 @@ const SETTING_DEFAULTS = {
   notif_maintenance: '1',
 };
 
+const TZ_MOSCOW = 'Europe/Moscow';
+
 function isOn(val) {
   return val === '1' || val === 'true' || val === true;
 }
@@ -40,33 +47,118 @@ function parseHexColor(v) {
   return s.toLowerCase();
 }
 
-function isWithinWorkHours(workHours) {
-  const m = String(workHours || '').match(/^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/);
-  if (!m) return true;
-  const start = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-  const end = parseInt(m[3], 10) * 60 + parseInt(m[4], 10);
+function looksLikeHexColor(v) {
+  return /^#[0-9a-fA-F]{6}$/i.test(String(v || '').trim());
+}
+
+function sanitizeEmailValue(v) {
+  const s = String(v || '').trim();
+  if (!s) return '';
+  if (looksLikeHexColor(s)) return '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return null;
+  return s.slice(0, 120);
+}
+
+function normalizeTimeHHMM(v) {
+  const s = String(v || '').trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+function parseLegacyRange(str) {
+  const m = String(str || '').match(/^(\d{1,2}:\d{2})-(\d{1,2}:\d{2})$/);
+  if (!m) return { start: '09:00', end: '21:00' };
+  const start = normalizeTimeHHMM(m[1]);
+  const end = normalizeTimeHHMM(m[2]);
+  return { start: start || '09:00', end: end || '21:00' };
+}
+
+function getMoscowMinutesNow() {
   const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/Moscow',
+    timeZone: TZ_MOSCOW,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
   }).formatToParts(new Date());
   const hour = parseInt(parts.find((p) => p.type === 'hour')?.value || '0', 10);
   const minute = parseInt(parts.find((p) => p.type === 'minute')?.value || '0', 10);
-  const now = hour * 60 + minute;
-  if (start <= end) return now >= start && now < end;
+  return hour * 60 + minute;
+}
+
+function timeToMinutes(hhmm) {
+  const t = normalizeTimeHHMM(hhmm);
+  if (!t) return 0;
+  const [h, m] = t.split(':').map((x) => parseInt(x, 10));
+  return h * 60 + m;
+}
+
+/** true if current Moscow time is inside [start, end). Supports overnight when start > end. */
+function isTimeInRange(startHHMM, endHHMM) {
+  const start = timeToMinutes(startHHMM);
+  const end = timeToMinutes(endHHMM);
+  const now = getMoscowMinutesNow();
+  if (start === end) return false;
+  if (start < end) return now >= start && now < end;
   return now >= start || now < end;
+}
+
+function getChatWorkRange() {
+  let start = normalizeTimeHHMM(getSetting('chat_work_start', ''));
+  let end = normalizeTimeHHMM(getSetting('chat_work_end', ''));
+  if (!start || !end) {
+    const legacy = parseLegacyRange(getSetting('chat_work_hours', '09:00-21:00'));
+    start = legacy.start;
+    end = legacy.end;
+  }
+  return { start, end, label: `${start}–${end}` };
+}
+
+function isWithinChatWorkHours() {
+  const { start, end } = getChatWorkRange();
+  return isTimeInRange(start, end);
+}
+
+function isManualMaintenanceOn() {
+  return isOn(getSetting('maintenance_mode', '0'));
+}
+
+function isMaintenanceScheduleActive() {
+  if (!isOn(getSetting('maintenance_schedule_enabled', '0'))) return false;
+  const start = normalizeTimeHHMM(getSetting('maintenance_schedule_start', '02:00')) || '02:00';
+  const end = normalizeTimeHHMM(getSetting('maintenance_schedule_end', '08:00')) || '08:00';
+  return isTimeInRange(start, end);
+}
+
+function isMaintenanceActive() {
+  return isManualMaintenanceOn() || isMaintenanceScheduleActive();
+}
+
+function getMaintenanceMessage() {
+  return getSetting('maintenance_message', 'Обмен временно приостановлен. Попробуйте позже.');
+}
+
+function syncChatWorkHoursString(start, end) {
+  setSetting('chat_work_start', start);
+  setSetting('chat_work_end', end);
+  setSetting('chat_work_hours', `${start}-${end}`);
 }
 
 function buildChatPublicConfig() {
   const showOnline = isOn(getSetting('chat_show_online', '1'));
-  const within = isWithinWorkHours(getSetting('chat_work_hours', '09:00-21:00'));
+  const { start, end, label } = getChatWorkRange();
+  const within = isWithinChatWorkHours();
   const online = showOnline && within;
   return {
     operatorName: getSetting('chat_operator_name', 'Bambusito228 Support'),
     welcomeMessage: getSetting('chat_welcome_message', 'Здравствуйте! Чем можем помочь?'),
     offlineMessage: getSetting('chat_offline_message', 'Оператор ответит в ближайшее время.'),
-    workHours: getSetting('chat_work_hours', '09:00-21:00'),
+    workHours: label,
+    workStart: start,
+    workEnd: end,
     showOnline,
     online,
     statusText: online ? 'Мы отвечаем сразу же' : getSetting('chat_offline_message', 'Оператор ответит в ближайшее время.'),
@@ -74,6 +166,8 @@ function buildChatPublicConfig() {
 }
 
 function buildPublicConfig() {
+  const schedStart = normalizeTimeHHMM(getSetting('maintenance_schedule_start', '02:00')) || '02:00';
+  const schedEnd = normalizeTimeHHMM(getSetting('maintenance_schedule_end', '08:00')) || '08:00';
   return {
     site_name: getSetting('site_name', 'Bambusito228'),
     site_tagline: getSetting('site_tagline', 'Быстрый обмен криптовалют'),
@@ -81,12 +175,17 @@ function buildPublicConfig() {
     markup_percent: parseFloat(getSetting('markup_percent', '1.5')),
     exchange_min_usd: parseFloat(getSetting('exchange_min_usd', '50')),
     exchange_max_usd: parseFloat(getSetting('exchange_max_usd', '50000')),
-    maintenance_mode: isOn(getSetting('maintenance_mode', '0')),
-    maintenance_message: getSetting('maintenance_message', 'Обмен временно приостановлен. Попробуйте позже.'),
+    maintenance_mode: isMaintenanceActive(),
+    maintenance_manual: isManualMaintenanceOn(),
+    maintenance_scheduled: isMaintenanceScheduleActive(),
+    maintenance_message: getMaintenanceMessage(),
+    maintenance_schedule_enabled: isOn(getSetting('maintenance_schedule_enabled', '0')),
+    maintenance_schedule_start: schedStart,
+    maintenance_schedule_end: schedEnd,
     chat: buildChatPublicConfig(),
     contacts: {
       telegram: getSetting('contact_telegram', ''),
-      email: getSetting('contact_email', ''),
+      email: sanitizeEmailValue(getSetting('contact_email', '')) || '',
     },
     rules_text: getSetting('rules_text', ''),
     faq_text: getSetting('faq_text', ''),
@@ -94,6 +193,12 @@ function buildPublicConfig() {
 }
 
 function formatAdminSettings(raw, extras = {}) {
+  const work = getChatWorkRange();
+  const emailRaw = raw.contact_email || '';
+  const email = looksLikeHexColor(emailRaw) ? '' : emailRaw;
+  const schedStart = normalizeTimeHHMM(raw.maintenance_schedule_start || '02:00') || '02:00';
+  const schedEnd = normalizeTimeHHMM(raw.maintenance_schedule_end || '08:00') || '08:00';
+
   return {
     markup_percent: parseFloat(raw.markup_percent || '1.5'),
     usd_rub_rate: parseFloat(raw.usd_rub_rate || '92.5'),
@@ -105,16 +210,24 @@ function formatAdminSettings(raw, extras = {}) {
     chat_operator_name: raw.chat_operator_name || 'Bambusito228 Support',
     chat_welcome_message: raw.chat_welcome_message || 'Здравствуйте! Чем можем помочь?',
     chat_offline_message: raw.chat_offline_message || 'Оператор ответит в ближайшее время.',
-    chat_work_hours: raw.chat_work_hours || '09:00-21:00',
+    chat_work_hours: raw.chat_work_hours || work.label.replace('–', '-'),
+    chat_work_start: work.start,
+    chat_work_end: work.end,
     chat_show_online: isOn(raw.chat_show_online ?? '1'),
     rate_provider: extras.rate_provider ?? raw.rate_provider ?? 'auto',
     rate_refresh_sec: parseInt(raw.rate_refresh_sec || '60', 10),
     exchange_min_usd: parseFloat(raw.exchange_min_usd || '50'),
     exchange_max_usd: parseFloat(raw.exchange_max_usd || '50000'),
     maintenance_mode: isOn(raw.maintenance_mode ?? '0'),
+    maintenance_effective:
+      isOn(raw.maintenance_mode ?? '0')
+      || (isOn(raw.maintenance_schedule_enabled ?? '0') && isTimeInRange(schedStart, schedEnd)),
     maintenance_message: raw.maintenance_message || 'Обмен временно приостановлен. Попробуйте позже.',
+    maintenance_schedule_enabled: isOn(raw.maintenance_schedule_enabled ?? '0'),
+    maintenance_schedule_start: schedStart,
+    maintenance_schedule_end: schedEnd,
     contact_telegram: raw.contact_telegram || '',
-    contact_email: raw.contact_email || '',
+    contact_email: email,
     rules_text: raw.rules_text || '',
     faq_text: raw.faq_text || '',
     notif_new_order: isOn(raw.notif_new_order ?? '1'),
@@ -174,11 +287,20 @@ function applySettingsPatch(body, { setDepositWallet } = {}) {
   if (b.chat_offline_message !== undefined) {
     setSetting('chat_offline_message', String(b.chat_offline_message).trim().slice(0, 500));
   }
-  if (b.chat_work_hours !== undefined) {
-    const wh = String(b.chat_work_hours).trim();
-    if (!/^\d{1,2}:\d{2}-\d{1,2}:\d{2}$/.test(wh)) errors.push('Часы работы: формат 09:00-21:00');
-    else setSetting('chat_work_hours', wh);
+
+  if (b.chat_work_start !== undefined || b.chat_work_end !== undefined) {
+    const current = getChatWorkRange();
+    const start = normalizeTimeHHMM(b.chat_work_start !== undefined ? b.chat_work_start : current.start);
+    const end = normalizeTimeHHMM(b.chat_work_end !== undefined ? b.chat_work_end : current.end);
+    if (!start || !end) errors.push('Укажите корректное время работы');
+    else if (start === end) errors.push('Начало и конец работы не могут совпадать');
+    else syncChatWorkHoursString(start, end);
+  } else if (b.chat_work_hours !== undefined) {
+    const legacy = parseLegacyRange(String(b.chat_work_hours).trim());
+    if (legacy.start === legacy.end) errors.push('Некорректные часы работы');
+    else syncChatWorkHoursString(legacy.start, legacy.end);
   }
+
   if (b.chat_show_online !== undefined) {
     setSetting('chat_show_online', b.chat_show_online ? '1' : '0');
   }
@@ -205,7 +327,7 @@ function applySettingsPatch(body, { setDepositWallet } = {}) {
   let maintenanceActivated = false;
 
   if (b.maintenance_mode !== undefined) {
-    const wasOff = !isOn(getSetting('maintenance_mode', '0'));
+    const wasOff = !isManualMaintenanceOn();
     const turningOn = !!b.maintenance_mode;
     setSetting('maintenance_mode', turningOn ? '1' : '0');
     if (wasOff && turningOn && shouldNotify('notif_maintenance')) {
@@ -215,11 +337,27 @@ function applySettingsPatch(body, { setDepositWallet } = {}) {
   if (b.maintenance_message !== undefined) {
     setSetting('maintenance_message', String(b.maintenance_message).trim().slice(0, 500));
   }
+  if (b.maintenance_schedule_enabled !== undefined) {
+    setSetting('maintenance_schedule_enabled', b.maintenance_schedule_enabled ? '1' : '0');
+  }
+  if (b.maintenance_schedule_start !== undefined) {
+    const t = normalizeTimeHHMM(b.maintenance_schedule_start);
+    if (!t) errors.push('Некорректное время начала паузы');
+    else setSetting('maintenance_schedule_start', t);
+  }
+  if (b.maintenance_schedule_end !== undefined) {
+    const t = normalizeTimeHHMM(b.maintenance_schedule_end);
+    if (!t) errors.push('Некорректное время конца паузы');
+    else setSetting('maintenance_schedule_end', t);
+  }
+
   if (b.contact_telegram !== undefined) {
     setSetting('contact_telegram', String(b.contact_telegram).trim().slice(0, 120));
   }
   if (b.contact_email !== undefined) {
-    setSetting('contact_email', String(b.contact_email).trim().slice(0, 120));
+    const email = sanitizeEmailValue(b.contact_email);
+    if (email === null) errors.push('Некорректный email (или оставьте пустым)');
+    else setSetting('contact_email', email);
   }
   if (b.rules_text !== undefined) setSetting('rules_text', String(b.rules_text).slice(0, 8000));
   if (b.faq_text !== undefined) setSetting('faq_text', String(b.faq_text).slice(0, 8000));
@@ -241,11 +379,19 @@ function applySettingsPatch(body, { setDepositWallet } = {}) {
 module.exports = {
   SETTING_DEFAULTS,
   isOn,
-  isWithinWorkHours,
+  isTimeInRange,
+  isWithinChatWorkHours,
+  isMaintenanceActive,
+  isManualMaintenanceOn,
+  isMaintenanceScheduleActive,
+  getMaintenanceMessage,
+  getChatWorkRange,
   buildPublicConfig,
   buildChatPublicConfig,
   formatAdminSettings,
   shouldNotify,
   getRateCacheTtlMs,
   applySettingsPatch,
+  sanitizeEmailValue,
+  normalizeTimeHHMM,
 };

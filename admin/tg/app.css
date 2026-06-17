@@ -507,6 +507,19 @@ html, body {
 .tg-settings-screen { display: none; }
 .tg-settings-screen.active { display: block; }
 
+.field input[type="time"] {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--secondary);
+  color: var(--text);
+  font-size: 1rem;
+  font-family: inherit;
+}
+
 .field textarea {
   display: block;
   width: 100%;

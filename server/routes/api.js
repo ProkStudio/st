@@ -9,7 +9,7 @@ const {
   updateOrderStatus,
 } = require('../db');
 const { convertAmount, getConversionRate } = require('../rates');
-const { buildPublicConfig, isOn } = require('../settings');
+const { buildPublicConfig, isOn, isMaintenanceActive, getMaintenanceMessage } = require('../settings');
 
 function createApiRouter(notifyOrder, notifyOrderUpdate) {
   const router = express.Router();
@@ -62,9 +62,9 @@ function createApiRouter(notifyOrder, notifyOrderUpdate) {
 
   router.post('/orders', async (req, res) => {
     try {
-      if (isOn(getSetting('maintenance_mode', '0'))) {
+      if (isMaintenanceActive()) {
         return res.status(503).json({
-          error: getSetting('maintenance_message', 'Обмен временно приостановлен. Попробуйте позже.'),
+          error: getMaintenanceMessage(),
         });
       }
 

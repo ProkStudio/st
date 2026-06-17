@@ -384,6 +384,11 @@ async function loadSettingsForm() {
   $('#deposit-wallet').value = st.deposit_wallet || '';
   $('#chat-operator').value = st.chat_operator_name || 'Bambusito228 Support';
   $('#chat-welcome').value = st.chat_welcome_message || '';
+  $('#chat-work-start').value = st.chat_work_start || '09:00';
+  $('#chat-work-end').value = st.chat_work_end || '21:00';
+  $('#maintenance-schedule-enabled').checked = !!st.maintenance_schedule_enabled;
+  $('#maintenance-schedule-start').value = st.maintenance_schedule_start || '02:00';
+  $('#maintenance-schedule-end').value = st.maintenance_schedule_end || '08:00';
   $('#rate-provider').value = st.rate_provider || 'auto';
   await loadRateStatus().catch(() => {});
 }
@@ -428,8 +433,13 @@ async function saveSettings() {
       order_ttl_minutes: $('#order-ttl').value,
       deposit_wallet: $('#deposit-wallet').value,
       chat_operator_name: $('#chat-operator').value,
-      chat_welcome_message: $('#chat-welcome').value,
-      rate_provider: $('#rate-provider').value,
+        chat_welcome_message: $('#chat-welcome').value,
+        chat_work_start: $('#chat-work-start').value,
+        chat_work_end: $('#chat-work-end').value,
+        maintenance_schedule_enabled: $('#maintenance-schedule-enabled').checked,
+        maintenance_schedule_start: $('#maintenance-schedule-start').value,
+        maintenance_schedule_end: $('#maintenance-schedule-end').value,
+        rate_provider: $('#rate-provider').value,
     };
     if (payload.maintenance_mode && !$('#maintenance-mode').dataset.wasOn) {
       const ok = await new Promise((resolve) => {
@@ -457,7 +467,7 @@ function switchTab(tab) {
   $$('.panel').forEach((p) => p.classList.remove('active'));
   $(`#panel-${tab}`).classList.add('active');
   $('#header-title').textContent = TAB_TITLES[tab] || tab;
-  setMainButtonVisible(tab === 'settings');
+  setMainButtonVisible(tab === 'settings' && (activeTgSettings === 'quick' || activeTgSettings === 'schedule' || activeTgSettings === 'wallet' || activeTgSettings === 'rates' || activeTgSettings === 'chat' || activeTgSettings === 'order'));
 
   if (tab === 'orders') loadOrders().catch(onError);
   if (tab === 'chat') loadChatSessions().catch(onError);
