@@ -101,14 +101,14 @@
           <div class="card">
             <h2>Часы поддержки</h2>
             <p class="hint">Москва. На сайте «офлайн» вне окна. Telegram-уведомления — 24/7.</p>
-            <label class="field">Начало<input type="time" id="chat-work-start" step="60"></label>
-            <label class="field">Конец<input type="time" id="chat-work-end" step="60"></label>
+            <label class="field">Начало<div class="time-24h" id="chat-work-start"></div></label>
+            <label class="field">Конец<div class="time-24h" id="chat-work-end"></div></label>
           </div>
           <div class="card">
             <h2>Техрежим по расписанию</h2>
             <label class="field toggle-field"><input type="checkbox" id="maintenance-schedule-enabled"> Пауза ежедневно</label>
-            <label class="field">Пауза с<input type="time" id="maintenance-schedule-start" step="60"></label>
-            <label class="field">Пауза до<input type="time" id="maintenance-schedule-end" step="60"></label>
+            <label class="field">Пауза с<div class="time-24h" id="maintenance-schedule-start"></div></label>
+            <label class="field">Пауза до<div class="time-24h" id="maintenance-schedule-end"></div></label>
             <p class="hint">Ручной техрежим — в разделе «Быстрое» (имеет приоритет над расписанием).</p>
           </div>
         </div>
@@ -143,6 +143,7 @@
     </form>
   </div>
 
+  <script src="/admin/time-24h.js"></script>
   <script src="/admin/tg/app.js"></script>
 </body>
 </html>

@@ -238,8 +238,8 @@
                 <label class="field-block">Приветствие<textarea id="chat-welcome-input" rows="2"></textarea></label>
                 <label class="field-block">Сообщение вне часов работы<textarea id="chat-offline-input" rows="2"></textarea></label>
                 <div class="time-range-row">
-                  <label class="field-block">Начало работы<input type="time" id="chat-work-start" step="60"></label>
-                  <label class="field-block">Конец работы<input type="time" id="chat-work-end" step="60"></label>
+                  <label class="field-block">Начало работы<div class="time-24h" id="chat-work-start"></div></label>
+                  <label class="field-block">Конец работы<div class="time-24h" id="chat-work-end"></div></label>
                 </div>
                 <p class="muted">Часовой пояс: Москва. Вне этого окна на сайте статус «офлайн». Уведомления в Telegram — всегда.</p>
                 <label class="field-block toggle-field"><input type="checkbox" id="chat-online-input"> Показывать статус «онлайн»</label>
@@ -278,8 +278,8 @@
                 <label class="field-block">Сообщение на сайте<textarea id="maintenance-msg-input" rows="2"></textarea></label>
                 <label class="field-block toggle-field"><input type="checkbox" id="maintenance-schedule-enabled"> Пауза по расписанию (ежедневно)</label>
                 <div class="time-range-row">
-                  <label class="field-block">Пауза с<input type="time" id="maintenance-schedule-start" step="60"></label>
-                  <label class="field-block">Пауза до<input type="time" id="maintenance-schedule-end" step="60"></label>
+                  <label class="field-block">Пауза с<div class="time-24h" id="maintenance-schedule-start"></div></label>
+                  <label class="field-block">Пауза до<div class="time-24h" id="maintenance-schedule-end"></div></label>
                 </div>
                 <p class="muted">Расписание по Москве. Если включён ручной техрежим — он важнее. Окно через полночь: например 22:00 → 09:00.</p>
                 <p class="muted" id="maintenance-effective-hint"></p>
@@ -304,6 +304,7 @@
     </section>
   </div>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="/admin/time-24h.js"></script>
   <script src="/admin/admin.js"></script>
 </body>
 </html>

@@ -11,6 +11,7 @@ function refreshIcons() {
 }
 
 refreshIcons();
+Time24h.mountAll();
 
 const STATUS_LABELS = {
   pending: 'Ожидает',
@@ -257,8 +258,8 @@ function fillSettingsForm(st) {
   $('#chat-operator-input').value = st.chat_operator_name || '';
   $('#chat-welcome-input').value = st.chat_welcome_message || '';
   $('#chat-offline-input').value = st.chat_offline_message || '';
-  $('#chat-work-start').value = st.chat_work_start || '09:00';
-  $('#chat-work-end').value = st.chat_work_end || '21:00';
+  $('#chat-work-start') && Time24h.setValue('chat-work-start', st.chat_work_start || '09:00');
+  $('#chat-work-end') && Time24h.setValue('chat-work-end', st.chat_work_end || '21:00');
   $('#chat-online-input').checked = !!st.chat_show_online;
   $('#notif-new-order').checked = !!st.notif_new_order;
   $('#notif-chat').checked = !!st.notif_chat_message;
@@ -278,8 +279,8 @@ function fillSettingsForm(st) {
   $('#maintenance-mode-input').dataset.wasOn = st.maintenance_mode ? '1' : '';
   $('#maintenance-msg-input').value = st.maintenance_message || '';
   $('#maintenance-schedule-enabled').checked = !!st.maintenance_schedule_enabled;
-  $('#maintenance-schedule-start').value = st.maintenance_schedule_start || '02:00';
-  $('#maintenance-schedule-end').value = st.maintenance_schedule_end || '08:00';
+  $('#maintenance-schedule-start') && Time24h.setValue('maintenance-schedule-start', st.maintenance_schedule_start || '02:00');
+  $('#maintenance-schedule-end') && Time24h.setValue('maintenance-schedule-end', st.maintenance_schedule_end || '08:00');
   const hint = $('#maintenance-effective-hint');
   if (hint) {
     hint.textContent = st.maintenance_effective
@@ -326,8 +327,8 @@ function collectSectionPayload(section) {
         chat_operator_name: $('#chat-operator-input').value,
         chat_welcome_message: $('#chat-welcome-input').value,
         chat_offline_message: $('#chat-offline-input').value,
-        chat_work_start: $('#chat-work-start').value,
-        chat_work_end: $('#chat-work-end').value,
+        chat_work_start: Time24h.getValue('chat-work-start'),
+        chat_work_end: Time24h.getValue('chat-work-end'),
         chat_show_online: $('#chat-online-input').checked,
       };
     case 'notifications':
@@ -350,8 +351,8 @@ function collectSectionPayload(section) {
         maintenance_mode: $('#maintenance-mode-input').checked,
         maintenance_message: $('#maintenance-msg-input').value,
         maintenance_schedule_enabled: $('#maintenance-schedule-enabled').checked,
-        maintenance_schedule_start: $('#maintenance-schedule-start').value,
-        maintenance_schedule_end: $('#maintenance-schedule-end').value,
+        maintenance_schedule_start: Time24h.getValue('maintenance-schedule-start'),
+        maintenance_schedule_end: Time24h.getValue('maintenance-schedule-end'),
       };
     default:
       return {};

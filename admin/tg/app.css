@@ -520,6 +520,30 @@ html, body {
   font-family: inherit;
 }
 
+.time-24h {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.time-24h select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.65rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--secondary);
+  color: var(--text);
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+.time-24h-sep {
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .field textarea {
   display: block;
   width: 100%;

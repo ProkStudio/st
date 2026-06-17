@@ -22,6 +22,8 @@ let pollTimer = null;
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 
+Time24h.mountAll();
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -384,11 +386,11 @@ async function loadSettingsForm() {
   $('#deposit-wallet').value = st.deposit_wallet || '';
   $('#chat-operator').value = st.chat_operator_name || 'Bambusito228 Support';
   $('#chat-welcome').value = st.chat_welcome_message || '';
-  $('#chat-work-start').value = st.chat_work_start || '09:00';
-  $('#chat-work-end').value = st.chat_work_end || '21:00';
+  Time24h.setValue('chat-work-start', st.chat_work_start || '09:00');
+  Time24h.setValue('chat-work-end', st.chat_work_end || '21:00');
   $('#maintenance-schedule-enabled').checked = !!st.maintenance_schedule_enabled;
-  $('#maintenance-schedule-start').value = st.maintenance_schedule_start || '02:00';
-  $('#maintenance-schedule-end').value = st.maintenance_schedule_end || '08:00';
+  Time24h.setValue('maintenance-schedule-start', st.maintenance_schedule_start || '02:00');
+  Time24h.setValue('maintenance-schedule-end', st.maintenance_schedule_end || '08:00');
   $('#rate-provider').value = st.rate_provider || 'auto';
   await loadRateStatus().catch(() => {});
 }
@@ -434,11 +436,11 @@ async function saveSettings() {
       deposit_wallet: $('#deposit-wallet').value,
       chat_operator_name: $('#chat-operator').value,
         chat_welcome_message: $('#chat-welcome').value,
-        chat_work_start: $('#chat-work-start').value,
-        chat_work_end: $('#chat-work-end').value,
+        chat_work_start: Time24h.getValue('chat-work-start'),
+        chat_work_end: Time24h.getValue('chat-work-end'),
         maintenance_schedule_enabled: $('#maintenance-schedule-enabled').checked,
-        maintenance_schedule_start: $('#maintenance-schedule-start').value,
-        maintenance_schedule_end: $('#maintenance-schedule-end').value,
+        maintenance_schedule_start: Time24h.getValue('maintenance-schedule-start'),
+        maintenance_schedule_end: Time24h.getValue('maintenance-schedule-end'),
         rate_provider: $('#rate-provider').value,
     };
     if (payload.maintenance_mode && !$('#maintenance-mode').dataset.wasOn) {

@@ -124,6 +124,13 @@ function parseStatusToken(token) {
   return STATUS_ALIASES[String(token || '').toLowerCase().replace(/\s+/g, '')];
 }
 
+function escapeTelegramHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function createTelegramBot() {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const noop = async () => {};
@@ -133,12 +140,40 @@ function createTelegramBot() {
   }
 
   let bot = null;
+  let botReady = false;
   let notifyAdmins = noop;
   let notifyNewOrder = noop;
   let notifyOrderUpdate = noop;
   let notifyChatMessage = noop;
 
   const adminIds = parseAdminIds();
+
+  notifyChatMessage = async (session, msg) => {
+    if (!shouldNotify('notif_chat_message')) return;
+    if (!botReady) {
+      for (let i = 0; i < 10 && !botReady; i += 1) {
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      if (!botReady) {
+        console.error('Chat TG notify skipped: bot not ready');
+        return;
+      }
+    }
+    const loc = [session.country, session.city].filter(Boolean).join(', ');
+    const { formatDeviceInfo } = require('../deviceInfo');
+    const deviceLine = escapeTelegramHtml(formatDeviceInfo(session.device_info, session.user_agent));
+    const orderLine = session.order_id
+      ? `📦 Ордер: <b>#${escapeTelegramHtml(session.order_id)}</b>`
+      : '📦 Ордер: <i>ещё не создан</i>';
+    const body = escapeTelegramHtml(msg?.body || '');
+    if (!body) return;
+    await notifyAdmins(
+      `💬 <b>Диалог #${escapeTelegramHtml(session.seq || '—')}</b> · ${orderLine}\n` +
+        `🌍 ${escapeTelegramHtml(loc || '—')} | IP: <code>${escapeTelegramHtml(session.ip || '—')}</code>\n` +
+        `📱 ${deviceLine}\n\n` +
+        body
+    );
+  };
 
   function isAdmin(ctx) {
     return adminIds.includes(ctx.from?.id);
@@ -345,6 +380,15 @@ function createTelegramBot() {
             });
           } catch (e) {
             console.error('TG notify error', id, e.message);
+            try {
+              const plain = text.replace(/<[^>]*>/g, '');
+              await bot.api.sendMessage(id, plain, {
+                ...extra,
+                reply_markup: extra.reply_markup ?? mainKeyboard(),
+              });
+            } catch (e2) {
+              console.error('TG notify fallback error', id, e2.message);
+            }
           }
         }
       };
@@ -355,22 +399,6 @@ function createTelegramBot() {
       };
 
       notifyOrderUpdate = noop;
-
-      notifyChatMessage = async (session, msg) => {
-        if (!shouldNotify('notif_chat_message')) return;
-        const loc = [session.country, session.city].filter(Boolean).join(', ');
-        const { formatDeviceInfo } = require('../deviceInfo');
-        const deviceLine = formatDeviceInfo(session.device_info, session.user_agent);
-        const orderLine = session.order_id
-          ? `📦 Ордер: <b>#${session.order_id}</b>`
-          : '📦 Ордер: <i>ещё не создан</i>';
-        await notifyAdmins(
-          `💬 <b>Диалог #${session.seq || '—'}</b> · ${orderLine}\n` +
-            `🌍 ${loc || '—'} | IP: <code>${session.ip || '—'}</code>\n` +
-            `📱 ${deviceLine}\n\n` +
-            `${msg.body}`
-        );
-      };
 
       bot.command('start', async (ctx) => {
         if (!isAdmin(ctx)) {
@@ -488,6 +516,7 @@ function createTelegramBot() {
       bot.catch((err) => console.error('Telegram bot error:', err));
 
       bot.start();
+      botReady = true;
       console.log(`🤖 Telegram bot @${me.username} запущен (admins: ${adminIds.join(', ')})`);
     } catch (e) {
       console.error('❌ Telegram bot не запустился:', e.message);
