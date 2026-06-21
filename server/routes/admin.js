@@ -16,6 +16,9 @@ const {
   addChatMessage,
   markChatSessionRead,
   countUnreadChats,
+  listWalletChecks,
+  getLastWalletCheck,
+  getLastWalletCheckForOrder,
 } = require('../db');
 const { authMiddleware, login, changePassword, signToken } = require('../auth');
 const {
@@ -32,6 +35,7 @@ const {
   normalizeProviderMode,
 } = require('../bybit');
 const { validateTelegramWebAppInitData, parseAdminIds } = require('../telegramWebApp');
+const { runWalletCheck, serializeCheckRow, RISK_LABELS } = require('../walletChecker');
 
 function createAdminRouter(notifyOrderUpdate, notifyAdmins) {
   const router = express.Router();
@@ -174,7 +178,9 @@ function createAdminRouter(notifyOrderUpdate, notifyAdmins) {
   router.get('/orders/:id', (req, res) => {
     const order = getOrder(req.params.id);
     if (!order) return res.status(404).json({ error: 'not_found' });
-    res.json({ order });
+    const wallet_check = serializeCheckRow(getLastWalletCheckForOrder(order.id))
+      || serializeCheckRow(getLastWalletCheck(order.address));
+    res.json({ order, wallet_check });
   });
 
   router.patch('/orders/:id', async (req, res) => {
@@ -224,6 +230,38 @@ function createAdminRouter(notifyOrderUpdate, notifyAdmins) {
     if (!body) return res.status(400).json({ error: 'Пустое сообщение' });
     const msg = addChatMessage(req.params.id, 'admin', body.slice(0, 2000));
     res.status(201).json({ message: msg });
+  });
+
+  router.get('/wallet-checks', (req, res) => {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const offset = parseInt(req.query.offset, 10) || 0;
+    const checks = listWalletChecks(limit, offset).map(serializeCheckRow);
+    res.json({ checks, risk_labels: RISK_LABELS });
+  });
+
+  router.get('/wallet-checks/latest', (req, res) => {
+    const { address, order_id: orderId, network } = req.query;
+    let row = null;
+    if (orderId) row = getLastWalletCheckForOrder(String(orderId));
+    if (!row && address) row = getLastWalletCheck(String(address).trim(), network || null);
+    res.json({ check: serializeCheckRow(row) });
+  });
+
+  router.post('/wallet-check', async (req, res) => {
+    try {
+      const { address, network, order_id: orderId, force } = req.body || {};
+      const check = await runWalletCheck({
+        address,
+        network,
+        orderId,
+        hintCurrency: req.body?.hint_currency,
+        source: orderId ? 'order_manual' : 'manual',
+        force: !!force,
+      });
+      res.json({ check });
+    } catch (e) {
+      res.status(400).json({ error: e.message || 'check_failed' });
+    }
   });
 
   return router;

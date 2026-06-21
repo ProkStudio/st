@@ -28,6 +28,146 @@ const RATE_MODE_LABELS = {
   coingecko: 'CoinGecko',
 };
 
+const RISK_CLASS = {
+  empty: 'risk-empty',
+  low: 'risk-low',
+  normal: 'risk-normal',
+  funded: 'risk-funded',
+  whale: 'risk-whale',
+  exchange_like: 'risk-exchange_like',
+  error: 'risk-error',
+};
+
+function riskBadge(check) {
+  if (!check?.risk) return '';
+  const label = check.risk.label_ru || check.risk.label || '—';
+  const cls = RISK_CLASS[check.risk.label] || 'risk-normal';
+  return `<span class="risk-badge ${cls}" title="${esc(check.risk.reason || '')}">${esc(label)}</span>`;
+}
+
+function formatUsd(n) {
+  return `$${Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+}
+
+function renderWalletCheckCard(check, { compact = false, showActions = false, orderId = '' } = {}) {
+  if (!check) {
+    return `<p class="muted">Проверок пока нет</p>`;
+  }
+  const cached = check.cached ? `<span class="muted"> · кэш</span>` : '';
+  const err = check.error ? `<p class="muted" style="color:var(--red)">${esc(check.error)}</p>` : '';
+  const native = check.native
+    ? `<div class="wallet-check-stat"><span>${esc(check.native.symbol)}</span><strong>${Number(check.native.amount).toFixed(8).replace(/\.?0+$/, '')}</strong></div>`
+    : '';
+  const tokens = (check.tokens || []).map((t) =>
+    `<li>${esc(t.symbol)} ${esc(t.network || '')}: ${Number(t.amount).toFixed(4)} (${formatUsd(t.usd)})</li>`
+  ).join('');
+  const actions = showActions ? `
+    <button type="button" class="btn-check-sm wallet-check-btn" data-address="${esc(check.address)}" data-order-id="${esc(orderId)}">Обновить</button>
+  ` : '';
+
+  if (compact) {
+    return `
+      <div class="wallet-check-inline">
+        <div class="wallet-check-inline-head">
+          ${riskBadge(check)}
+          <span class="muted">${formatUsd(check.usd_total)} · ${check.tx_count || 0} tx${cached}</span>
+          ${actions}
+        </div>
+        ${err}
+      </div>`;
+  }
+
+  return `
+    <div class="wallet-check-head">
+      <div>
+        <strong>${esc((check.network || '').toUpperCase())}</strong>${cached}
+        <div class="wallet-check-addr">${esc(check.address)}</div>
+      </div>
+      ${riskBadge(check)}
+    </div>
+    <div class="wallet-check-grid">
+      ${native}
+      <div class="wallet-check-stat"><span>USD всего</span><strong>${formatUsd(check.usd_total)}</strong></div>
+      <div class="wallet-check-stat"><span>Транзакций</span><strong>${check.tx_count || 0}</strong></div>
+    </div>
+    ${tokens ? `<ul class="wallet-check-tokens">${tokens}</ul>` : ''}
+    ${check.risk?.reason ? `<p class="muted" style="margin-top:0.5rem;font-size:0.82rem">${esc(check.risk.reason)}</p>` : ''}
+    ${err}
+    <p class="muted" style="margin-top:0.5rem;font-size:0.75rem">${formatDate(check.created_at)} · ${esc(check.source || '')}</p>
+  `;
+}
+
+async function runWalletCheckUi({ address, network, orderId, force = false, targetEl }) {
+  const payload = { address, force };
+  if (network) payload.network = network;
+  if (orderId) payload.order_id = orderId;
+  const { check } = await api('/wallet-check', { method: 'POST', body: JSON.stringify(payload) });
+  if (targetEl) {
+    targetEl.innerHTML = renderWalletCheckCard(check, { compact: !!targetEl.dataset.compact, showActions: true, orderId });
+    targetEl.classList.remove('hidden');
+    targetEl.querySelector('.wallet-check-btn')?.addEventListener('click', () => {
+      runWalletCheckUi({ address: check.address, network: check.network, orderId, force: true, targetEl }).catch((e) => toast(e.message, false));
+    });
+  }
+  return check;
+}
+
+async function loadCheckerJournal() {
+  const { checks } = await api('/wallet-checks?limit=100');
+  const tbody = $('#checker-journal');
+  if (!checks.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="muted">Журнал пуст</td></tr>';
+    return;
+  }
+  tbody.innerHTML = checks.map((c) => `
+    <tr>
+      <td>${formatDate(c.created_at)}</td>
+      <td class="order-addr" title="${esc(c.address)}">${esc(c.address.slice(0, 18))}…</td>
+      <td>${esc((c.network || '').toUpperCase())}</td>
+      <td>${formatUsd(c.usd_total)}</td>
+      <td>${c.tx_count || 0}</td>
+      <td>${riskBadge(c)}</td>
+      <td>${c.order_id ? `#${esc(c.order_id)}` : '—'}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadCheckerTab() {
+  const data = await api('/dashboard');
+  const st = data.settings;
+  $('#wallet-check-enabled').checked = !!st.wallet_check_enabled;
+  $('#wallet-check-auto').checked = !!st.wallet_check_auto_on_order;
+  $('#wallet-check-cooldown').value = st.wallet_check_cooldown_minutes ?? 5;
+  await loadCheckerJournal();
+}
+
+async function loadOrderWalletCheck(order, container) {
+  if (!order?.address || !container) return;
+  try {
+    const { check } = await api(`/wallet-checks/latest?order_id=${encodeURIComponent(order.id)}&address=${encodeURIComponent(order.address)}`);
+    container.innerHTML = renderWalletCheckCard(check, { compact: true, showActions: true, orderId: order.id });
+    container.classList.remove('hidden');
+    container.querySelector('.wallet-check-btn')?.addEventListener('click', () => {
+      runWalletCheckUi({
+        address: order.address,
+        orderId: order.id,
+        force: false,
+        targetEl: container,
+      }).catch((e) => toast(e.message, false));
+    });
+  } catch {
+    container.innerHTML = `<button type="button" class="btn-check-sm wallet-check-btn" data-address="${esc(order.address)}" data-order-id="${esc(order.id)}">Проверить адрес</button>`;
+    container.classList.remove('hidden');
+    container.querySelector('.wallet-check-btn')?.addEventListener('click', (e) => {
+      runWalletCheckUi({
+        address: order.address,
+        orderId: order.id,
+        targetEl: container,
+      }).catch((err) => toast(err.message, false));
+    });
+  }
+}
+
 async function api(path, opts = {}) {
   const res = await fetch(API + path, {
     ...opts,
@@ -86,7 +226,10 @@ function renderOrderRow(o, compact = false) {
       <td class="order-addr">${o.address}</td>
       <td>${badge(o.status)}</td>
       <td>${formatDate(o.created_at)}</td>
-      <td>${statusSelect}</td>
+      <td class="order-check-cell">
+        ${statusSelect}
+        <button type="button" class="btn-check-sm order-wallet-check" data-id="${o.id}" data-address="${esc(o.address)}">🔍 Баланс</button>
+      </td>
     </tr>`;
 }
 
@@ -172,7 +315,11 @@ async function openChatSession(id) {
     <div class="chat-meta-line">IP: <code>${esc(data.session.ip || '—')}</code></div>
     <div class="chat-meta-line muted">${esc(data.session.device_label || 'Устройство неизвестно')}</div>
     ${data.session.order ? `<div class="chat-meta-line">💱 ${esc(data.session.order.amount_from)} ${esc(data.session.order.from_currency)} → ${Number(data.session.order.amount_to).toFixed(6)} ${esc(data.session.order.to_currency)}</div>` : ''}
+    <div id="chat-wallet-check" class="wallet-check-inline hidden" data-compact="1"></div>
   `;
+  if (data.session.order) {
+    loadOrderWalletCheck(data.session.order, $('#chat-wallet-check'));
+  }
   renderChatMessages(data.messages);
   loadChatSessions();
 }
@@ -243,6 +390,17 @@ async function loadDashboard() {
   const table = $('#orders-table');
   table.innerHTML = all.orders.map((o) => renderOrderRow(o)).join('');
   bindStatusSelects(table.parentElement);
+  table.parentElement.querySelectorAll('.order-wallet-check').forEach((btn) => {
+    btn.onclick = async () => {
+      try {
+        const check = await runWalletCheckUi({ address: btn.dataset.address, orderId: btn.dataset.id });
+        alert(`${check.risk?.label_ru || '—'} · ${formatUsd(check.usd_total)} · ${check.tx_count || 0} tx`);
+        loadCheckerJournal().catch(() => {});
+      } catch (e) {
+        toast(e.message, false);
+      }
+    };
+  });
 }
 
 function fillSettingsForm(st) {
@@ -421,10 +579,11 @@ $$('.nav-item').forEach((btn) => {
     btn.classList.add('active');
     $$('.tab').forEach((t) => t.classList.remove('active'));
     $(`#tab-${btn.dataset.tab}`).classList.add('active');
-    const titles = { overview: 'Обзор', orders: 'Ордера', chat: 'Чат', settings: 'Настройки' };
+    const titles = { overview: 'Обзор', orders: 'Ордера', checker: 'Чекер', chat: 'Чат', settings: 'Настройки' };
     $('#page-title').textContent = titles[btn.dataset.tab];
     refreshIcons();
     if (btn.dataset.tab === 'chat') loadChatSessions();
+    if (btn.dataset.tab === 'checker') loadCheckerTab().catch((e) => toast(e.message, false));
     if (btn.dataset.tab === 'settings') {
       switchSettingsPanel('exchange');
       loadRateStatus().catch(() => {});
@@ -499,6 +658,65 @@ function toast(msg, ok = true) {
 $('#refresh-orders').onclick = loadDashboard;
 $('#refresh-chat').onclick = loadChatSessions;
 $('#refresh-rate-status').onclick = () => loadRateStatus().catch((e) => toast(e.message, false));
+$('#refresh-checker').onclick = () => loadCheckerJournal().catch((e) => toast(e.message, false));
+
+$('#checker-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const address = $('#checker-address').value.trim();
+  const network = $('#checker-network').value;
+  const orderId = $('#checker-order-id').value.trim();
+  const targetEl = $('#checker-result');
+  targetEl.dataset.compact = '';
+  try {
+    $('#checker-run-btn').disabled = true;
+    const check = await runWalletCheckUi({
+      address,
+      network: network || undefined,
+      orderId: orderId || undefined,
+      targetEl,
+    });
+    loadCheckerJournal().catch(() => {});
+    toast(check.cached ? 'Из кэша (кулдаун)' : 'Проверка выполнена');
+  } catch (err) {
+    toast(err.message, false);
+  } finally {
+    $('#checker-run-btn').disabled = false;
+  }
+};
+
+$('#checker-force-btn').onclick = async () => {
+  const address = $('#checker-address').value.trim();
+  if (!address) return toast('Укажите адрес', false);
+  try {
+    await runWalletCheckUi({
+      address,
+      network: $('#checker-network').value || undefined,
+      orderId: $('#checker-order-id').value.trim() || undefined,
+      force: true,
+      targetEl: $('#checker-result'),
+    });
+    loadCheckerJournal().catch(() => {});
+    toast('Принудительная проверка выполнена');
+  } catch (e) {
+    toast(e.message, false);
+  }
+};
+
+$('#wallet-check-save-btn').onclick = async () => {
+  try {
+    await api('/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        wallet_check_enabled: $('#wallet-check-enabled').checked,
+        wallet_check_auto_on_order: $('#wallet-check-auto').checked,
+        wallet_check_cooldown_minutes: $('#wallet-check-cooldown').value,
+      }),
+    });
+    toast('Настройки чекера сохранены');
+  } catch (e) {
+    toast(e.message, false);
+  }
+};
 
 $('#chat-reply-form').onsubmit = async (e) => {
   e.preventDefault();

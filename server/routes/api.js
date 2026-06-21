@@ -10,6 +10,7 @@ const {
 } = require('../db');
 const { convertAmount, getConversionRate } = require('../rates');
 const { buildPublicConfig, isOn, isMaintenanceActive, getMaintenanceMessage } = require('../settings');
+const { scheduleWalletCheckForOrder } = require('../walletChecker');
 
 function createApiRouter(notifyOrder, notifyOrderUpdate) {
   const router = express.Router();
@@ -111,6 +112,7 @@ function createApiRouter(notifyOrder, notifyOrderUpdate) {
       });
 
       if (notifyOrder) await notifyOrder(order);
+      scheduleWalletCheckForOrder(order);
 
       res.status(201).json({ order });
     } catch (e) {

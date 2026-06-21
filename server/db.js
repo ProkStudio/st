@@ -57,6 +57,22 @@ db.exec(`
     body TEXT NOT NULL,
     created_at INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS wallet_checks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    address TEXT NOT NULL,
+    network TEXT NOT NULL,
+    order_id TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT 'manual',
+    balances_json TEXT NOT NULL DEFAULT '{}',
+    usd_total REAL NOT NULL DEFAULT 0,
+    tx_count INTEGER NOT NULL DEFAULT 0,
+    risk_label TEXT NOT NULL DEFAULT '',
+    risk_reason TEXT NOT NULL DEFAULT '',
+    error TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_wallet_checks_address ON wallet_checks(address, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_wallet_checks_order ON wallet_checks(order_id, created_at DESC);
 `);
 
 const defaults = {
@@ -92,6 +108,9 @@ const defaults = {
   notif_chat_message: '1',
   notif_bybit_deposit: '1',
   notif_maintenance: '1',
+  wallet_check_enabled: '1',
+  wallet_check_auto_on_order: '1',
+  wallet_check_cooldown_minutes: '5',
 };
 
 const orderColumns = [
@@ -443,6 +462,63 @@ function countUnreadChats() {
   return db.prepare('SELECT COUNT(*) as c FROM chat_sessions WHERE unread_admin > 0').get().c;
 }
 
+function saveWalletCheck(data) {
+  const now = Date.now();
+  const info = db.prepare(`
+    INSERT INTO wallet_checks (
+      address, network, order_id, source, balances_json,
+      usd_total, tx_count, risk_label, risk_reason, error, created_at
+    ) VALUES (
+      @address, @network, @order_id, @source, @balances_json,
+      @usd_total, @tx_count, @risk_label, @risk_reason, @error, @now
+    )
+  `).run({
+    order_id: '',
+    source: 'manual',
+    error: '',
+    ...data,
+    now,
+  });
+  return db.prepare('SELECT * FROM wallet_checks WHERE id = ?').get(info.lastInsertRowid);
+}
+
+function getLastWalletCheck(address, network = null) {
+  const addr = String(address || '').trim();
+  if (!addr) return null;
+  if (network) {
+    return db.prepare(`
+      SELECT * FROM wallet_checks WHERE address = ? AND network = ?
+      ORDER BY created_at DESC LIMIT 1
+    `).get(addr, network);
+  }
+  return db.prepare(`
+    SELECT * FROM wallet_checks WHERE address = ?
+    ORDER BY created_at DESC LIMIT 1
+  `).get(addr);
+}
+
+function getLastWalletCheckForOrder(orderId) {
+  if (!orderId) return null;
+  return db.prepare(`
+    SELECT * FROM wallet_checks WHERE order_id = ?
+    ORDER BY created_at DESC LIMIT 1
+  `).get(orderId);
+}
+
+function listWalletChecks(limit = 50, offset = 0) {
+  return db.prepare(`
+    SELECT * FROM wallet_checks ORDER BY created_at DESC LIMIT ? OFFSET ?
+  `).all(Math.min(limit, 200), offset);
+}
+
+function getWalletCheckCooldownRemaining(address, network, cooldownMinutes) {
+  const last = getLastWalletCheck(address, network);
+  if (!last) return 0;
+  const cooldownMs = Math.max(1, cooldownMinutes) * 60 * 1000;
+  const elapsed = Date.now() - last.created_at;
+  return Math.max(0, cooldownMs - elapsed);
+}
+
 module.exports = {
   db,
   getSetting,
@@ -472,4 +548,9 @@ module.exports = {
   addChatMessage,
   markChatSessionRead,
   countUnreadChats,
+  saveWalletCheck,
+  getLastWalletCheck,
+  getLastWalletCheckForOrder,
+  listWalletChecks,
+  getWalletCheckCooldownRemaining,
 };

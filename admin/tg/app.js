@@ -8,9 +8,77 @@ const STATUS_LABELS = {
 const TAB_TITLES = {
   overview: 'Обзор',
   orders: 'Ордера',
+  checker: 'Чекер',
   chat: 'Чат',
   settings: 'Настройки',
 };
+
+const RISK_CLASS = {
+  empty: 'risk-empty',
+  low: 'risk-low',
+  normal: 'risk-normal',
+  funded: 'risk-funded',
+  whale: 'risk-whale',
+  exchange_like: 'risk-exchange_like',
+  error: 'risk-error',
+};
+
+function formatUsd(n) {
+  return `$${Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+}
+
+function riskBadgeTg(check) {
+  if (!check?.risk) return '';
+  const label = check.risk.label_ru || check.risk.label || '—';
+  const cls = RISK_CLASS[check.risk.label] || 'risk-normal';
+  return `<span class="risk-pill ${cls}">${esc(label)}</span>`;
+}
+
+function renderTgCheckCard(check) {
+  if (!check) return '<p class="empty">Нет данных</p>';
+  const tokens = (check.tokens || []).map((t) =>
+    `<div class="hint">${esc(t.symbol)} ${esc(t.network || '')}: ${Number(t.amount).toFixed(4)}</div>`
+  ).join('');
+  return `
+    <div class="check-card-top">
+      ${riskBadgeTg(check)}
+      <strong>${formatUsd(check.usd_total)}</strong>
+    </div>
+    <div class="hint mono">${esc(check.address)}</div>
+    <div class="hint">${esc((check.network || '').toUpperCase())} · ${check.tx_count || 0} tx · ${formatDate(check.created_at)}</div>
+    ${check.native ? `<div>${esc(check.native.symbol)}: ${Number(check.native.amount).toFixed(6)}</div>` : ''}
+    ${tokens}
+    ${check.error ? `<div class="hint" style="color:var(--red)">${esc(check.error)}</div>` : ''}
+  `;
+}
+
+async function loadCheckerJournalTg() {
+  const { checks } = await api('/wallet-checks?limit=30');
+  const box = $('#tg-checker-journal');
+  if (!checks.length) {
+    box.innerHTML = '<p class="empty">Журнал пуст</p>';
+    return;
+  }
+  box.innerHTML = checks.map((c) => `
+    <article class="order-card">
+      <div class="order-top">${riskBadgeTg(c)}<span class="hint">${formatUsd(c.usd_total)}</span></div>
+      <div class="order-meta mono">${esc(c.address.slice(0, 22))}…</div>
+      <div class="hint">${esc((c.network || '').toUpperCase())} · ${formatDate(c.created_at)}${c.order_id ? ` · #${esc(c.order_id)}` : ''}</div>
+    </article>
+  `).join('');
+}
+
+async function loadCheckerTg() {
+  await loadCheckerJournalTg();
+}
+
+async function runTgWalletCheck({ address, network, orderId, force = false }) {
+  const payload = { address, force };
+  if (network) payload.network = network;
+  if (orderId) payload.order_id = orderId;
+  const { check } = await api('/wallet-check', { method: 'POST', body: JSON.stringify(payload) });
+  return check;
+}
 
 const tg = window.Telegram?.WebApp;
 let token = null;
@@ -238,6 +306,7 @@ function orderCard(o, showDate = false) {
       <div class="order-pair">${esc(o.amount_from)} ${esc(o.from_currency)} → ${Number(o.amount_to).toFixed(6)} ${esc(o.to_currency)}</div>
       <div class="order-meta">${esc(o.address)}</div>
       ${showDate ? `<div class="order-meta">${formatDate(o.created_at)}</div>` : ''}
+      <button type="button" class="btn-secondary btn-block btn-sm tg-order-check" data-id="${esc(o.id)}" data-address="${esc(o.address)}">🔍 Проверить адрес</button>
       ${statusSelect}
     </article>`;
 }
@@ -299,6 +368,21 @@ async function loadOrders() {
     ? orders.map((o) => orderCard(o, true)).join('')
     : '<p class="empty">Ордеров пока нет</p>';
   bindStatusSelects(list);
+  list.querySelectorAll('.tg-order-check').forEach((btn) => {
+    btn.onclick = async () => {
+      try {
+        haptic('medium');
+        btn.disabled = true;
+        const check = await runTgWalletCheck({ address: btn.dataset.address, orderId: btn.dataset.id });
+        tg?.showAlert?.(`${check.risk?.label_ru || '—'}\n${formatUsd(check.usd_total)} · ${check.tx_count || 0} tx`) ||
+          alert(`${check.risk?.label_ru} · ${formatUsd(check.usd_total)}`);
+      } catch (e) {
+        tg?.showAlert?.(e.message) || alert(e.message);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  });
 }
 
 function chatSessionHeadline(s) {
@@ -359,7 +443,27 @@ async function openChatOverlay(id) {
     <span>${esc(loc || 'Посетитель')} · IP: ${esc(data.session.ip || '—')}</span>
     <span>${esc(data.session.device_label || 'Устройство неизвестно')}</span>
     ${data.session.order ? `<span>💱 ${esc(data.session.order.amount_from)} ${esc(data.session.order.from_currency)} → ${Number(data.session.order.amount_to).toFixed(6)} ${esc(data.session.order.to_currency)}</span>` : ''}
+    <span id="chat-overlay-wallet" class="hint"></span>
   `;
+  const walletEl = $('#chat-overlay-wallet');
+  if (data.session.order?.address) {
+    try {
+      const { check } = await api(`/wallet-checks/latest?order_id=${encodeURIComponent(data.session.order.id)}&address=${encodeURIComponent(data.session.order.address)}`);
+      if (check) {
+        walletEl.innerHTML = `🔍 ${riskBadgeTg(check)} ${formatUsd(check.usd_total)} · ${check.tx_count || 0} tx`;
+      } else {
+        walletEl.innerHTML = `<button type="button" class="btn-secondary btn-sm" id="chat-wallet-check-btn">Проверить адрес ордера</button>`;
+        $('#chat-wallet-check-btn').onclick = async () => {
+          try {
+            const check = await runTgWalletCheck({ address: data.session.order.address, orderId: data.session.order.id });
+            walletEl.innerHTML = `🔍 ${riskBadgeTg(check)} ${formatUsd(check.usd_total)} · ${check.tx_count || 0} tx`;
+          } catch (e) {
+            tg?.showAlert?.(e.message);
+          }
+        };
+      }
+    } catch { /* ignore */ }
+  }
   renderChatMessages(data.messages);
   $('#chat-overlay').classList.remove('hidden');
   $('#app').classList.add('chat-mode');
@@ -472,6 +576,7 @@ function switchTab(tab) {
   setMainButtonVisible(tab === 'settings' && (activeTgSettings === 'quick' || activeTgSettings === 'schedule' || activeTgSettings === 'wallet' || activeTgSettings === 'rates' || activeTgSettings === 'chat' || activeTgSettings === 'order'));
 
   if (tab === 'orders') loadOrders().catch(onError);
+  if (tab === 'checker') loadCheckerTg().catch(onError);
   if (tab === 'chat') loadChatSessions().catch(onError);
   if (tab === 'settings') loadSettingsForm().catch(onError);
   if (tab === 'overview') loadOverview().catch(onError);
@@ -480,6 +585,7 @@ function switchTab(tab) {
 async function refreshAll() {
   if (activeTab === 'overview') await loadOverview();
   if (activeTab === 'orders') await loadOrders();
+  if (activeTab === 'checker') await loadCheckerTg();
   if (activeTab === 'chat' && !activeChatId) await loadChatSessions();
   if (activeTab === 'settings') await loadSettingsForm();
   if (activeChatId) {
@@ -516,6 +622,28 @@ $('#btn-refresh').addEventListener('click', () => {
 $('#btn-rate-check').addEventListener('click', () => {
   haptic('light');
   loadRateStatus().catch((e) => toast(e.message, false));
+});
+
+$('#tg-checker-run').addEventListener('click', async () => {
+  const address = $('#tg-checker-address').value.trim();
+  if (!address) return toast('Укажите адрес', false);
+  try {
+    haptic('medium');
+    $('#tg-checker-run').disabled = true;
+    const check = await runTgWalletCheck({
+      address,
+      network: $('#tg-checker-network').value || undefined,
+    });
+    const box = $('#tg-checker-result');
+    box.innerHTML = renderTgCheckCard(check);
+    box.classList.remove('hidden');
+    loadCheckerJournalTg().catch(() => {});
+  } catch (e) {
+    toast(e.message, false);
+    tg?.showAlert?.(e.message);
+  } finally {
+    $('#tg-checker-run').disabled = false;
+  }
 });
 
 $$('.tg-pill').forEach((btn) => {

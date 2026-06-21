@@ -33,6 +33,9 @@ const SETTING_DEFAULTS = {
   notif_chat_message: '1',
   notif_bybit_deposit: '1',
   notif_maintenance: '1',
+  wallet_check_enabled: '1',
+  wallet_check_auto_on_order: '1',
+  wallet_check_cooldown_minutes: '5',
 };
 
 const TZ_MOSCOW = 'Europe/Moscow';
@@ -235,6 +238,9 @@ function formatAdminSettings(raw, extras = {}) {
     notif_chat_message: isOn(raw.notif_chat_message ?? '1'),
     notif_bybit_deposit: isOn(raw.notif_bybit_deposit ?? '1'),
     notif_maintenance: isOn(raw.notif_maintenance ?? '1'),
+    wallet_check_enabled: isOn(raw.wallet_check_enabled ?? '1'),
+    wallet_check_auto_on_order: isOn(raw.wallet_check_auto_on_order ?? '1'),
+    wallet_check_cooldown_minutes: parseInt(raw.wallet_check_cooldown_minutes || '5', 10),
     admin_username: raw.admin_username || 'admin',
     ...extras,
   };
@@ -371,6 +377,18 @@ function applySettingsPatch(body, { setDepositWallet } = {}) {
   ];
   for (const key of boolKeys) {
     if (b[key] !== undefined) setSetting(key, b[key] ? '1' : '0');
+  }
+
+  if (b.wallet_check_enabled !== undefined) {
+    setSetting('wallet_check_enabled', b.wallet_check_enabled ? '1' : '0');
+  }
+  if (b.wallet_check_auto_on_order !== undefined) {
+    setSetting('wallet_check_auto_on_order', b.wallet_check_auto_on_order ? '1' : '0');
+  }
+  if (b.wallet_check_cooldown_minutes !== undefined) {
+    const v = parseInt(b.wallet_check_cooldown_minutes, 10);
+    if (Number.isNaN(v) || v < 1 || v > 60) errors.push('Кулдаун проверки: 1–60 минут');
+    else setSetting('wallet_check_cooldown_minutes', v);
   }
 
   return { errors, maintenanceActivated };

@@ -44,6 +44,26 @@
         <div id="orders-list" class="stack-list"></div>
       </section>
 
+      <section id="panel-checker" class="panel">
+        <div class="card">
+          <label class="field">Адрес<input type="text" id="tg-checker-address" autocomplete="off" placeholder="bc1… / 0x… / T…"></label>
+          <label class="field">Сеть
+            <select id="tg-checker-network">
+              <option value="">Авто</option>
+              <option value="btc">BTC</option>
+              <option value="eth">ETH + USDT ERC20</option>
+              <option value="trx">TRX + USDT TRC20</option>
+            </select>
+          </label>
+          <button type="button" class="btn-primary btn-block" id="tg-checker-run">Проверить</button>
+        </div>
+        <div id="tg-checker-result" class="card hidden"></div>
+        <div class="card">
+          <div class="card-head"><h2>Журнал</h2></div>
+          <div id="tg-checker-journal" class="stack-list"></div>
+        </div>
+      </section>
+
       <section id="panel-chat" class="panel">
         <div id="chat-sessions" class="stack-list"></div>
       </section>
@@ -126,6 +146,7 @@
     <nav class="bottom-nav" id="bottom-nav">
       <button type="button" class="nav-btn active" data-tab="overview"><span>📊</span>Обзор</button>
       <button type="button" class="nav-btn" data-tab="orders"><span>📋</span>Ордера</button>
+      <button type="button" class="nav-btn" data-tab="checker"><span>🔍</span>Чекер</button>
       <button type="button" class="nav-btn" data-tab="chat"><span>💬</span>Чат<b class="nav-badge hidden" id="chat-badge">0</b></button>
       <button type="button" class="nav-btn" data-tab="settings"><span>⚙️</span>Ещё</button>
     </nav>

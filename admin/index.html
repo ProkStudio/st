@@ -36,6 +36,7 @@
         <nav>
           <button class="nav-item active" data-tab="overview"><i data-lucide="layout-dashboard"></i> Обзор</button>
           <button class="nav-item" data-tab="orders"><i data-lucide="list-ordered"></i> Ордера</button>
+          <button class="nav-item" data-tab="checker"><i data-lucide="scan-search"></i> Чекер</button>
           <button class="nav-item" data-tab="chat"><i data-lucide="message-circle"></i> Чат <span class="nav-badge hidden" id="chat-badge">0</span></button>
           <button class="nav-item" data-tab="settings"><i data-lucide="settings"></i> Настройки</button>
         </nav>
@@ -137,6 +138,65 @@
                 </thead>
                 <tbody id="orders-table"></tbody>
               </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-checker" class="tab">
+          <div class="checker-layout">
+            <div class="panel">
+              <div class="panel-head"><h3>Проверка адреса</h3></div>
+              <form id="checker-form" class="checker-form">
+                <label class="field-block">Адрес кошелька<input type="text" id="checker-address" placeholder="bc1… / 0x… / T…" autocomplete="off"></label>
+                <label class="field-block">Сеть (авто)<select id="checker-network">
+                  <option value="">Авто</option>
+                  <option value="btc">Bitcoin</option>
+                  <option value="eth">Ethereum (+ USDT ERC20)</option>
+                  <option value="trx">TRON (+ USDT TRC20)</option>
+                </select></label>
+                <label class="field-block">ID ордера (необяз.)<input type="text" id="checker-order-id" placeholder="ABC12345" autocomplete="off"></label>
+                <div class="checker-actions">
+                  <button type="submit" class="btn-primary" id="checker-run-btn">Проверить</button>
+                  <button type="button" class="btn-ghost" id="checker-force-btn">Принудительно</button>
+                </div>
+                <p class="muted" id="checker-hint">BTC, ETH, TRX и USDT (TRC20/ERC20). Без API-ключей — возможны лимиты.</p>
+              </form>
+              <div id="checker-result" class="wallet-check-card hidden"></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <h3>Настройки чекера</h3>
+              </div>
+              <div class="settings-section" style="padding:1rem 1.25rem">
+                <label class="field-block toggle-field"><input type="checkbox" id="wallet-check-enabled"> Включить проверку</label>
+                <label class="field-block toggle-field"><input type="checkbox" id="wallet-check-auto"> Авто при новом ордере</label>
+                <label class="field-block inline-field">Кулдаун, мин<input type="number" id="wallet-check-cooldown" min="1" max="60" step="1"></label>
+                <button type="button" class="btn-primary btn-sm" id="wallet-check-save-btn">Сохранить</button>
+              </div>
+            </div>
+
+            <div class="panel checker-journal-panel">
+              <div class="panel-head">
+                <h3>Журнал проверок</h3>
+                <button class="btn-ghost" id="refresh-checker">Обновить</button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Дата</th>
+                      <th>Адрес</th>
+                      <th>Сеть</th>
+                      <th>USD</th>
+                      <th>Tx</th>
+                      <th>Риск</th>
+                      <th>Ордер</th>
+                    </tr>
+                  </thead>
+                  <tbody id="checker-journal"></tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
