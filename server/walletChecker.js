@@ -7,6 +7,11 @@ const {
 } = require('./db');
 const { getConversionRate } = require('./rates');
 const { isOn } = require('./settings');
+const {
+  fetchTrxBalanceSun,
+  fetchTrc20BalanceRaw,
+  tronExplorerAddressUrl,
+} = require('./tronUtil');
 
 const USDT_ERC20 = '0xdac17f958d2ee523a2206206994597c13d831ec7';
 const USDT_TRC20 = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
@@ -170,36 +175,6 @@ async function fetchTronScanAccount(address) {
   return fetchJson(`https://apilist.tronscan.org/api/account?address=${encodeURIComponent(address)}`);
 }
 
-async function fetchTronGetAccount(address) {
-  const data = await fetchJson('https://api.trongrid.io/wallet/getaccount', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ address, visible: true }),
-  });
-  return data && typeof data === 'object' ? data : {};
-}
-
-async function fetchTronGridV1Account(address) {
-  const data = await fetchJson(`https://api.trongrid.io/v1/accounts/${encodeURIComponent(address)}`);
-  return data.data?.[0] || null;
-}
-
-function parseTrc20FromGrid(acc) {
-  const out = [];
-  for (const entry of acc?.trc20 || []) {
-    const [contract, rawBal] = Object.entries(entry)[0] || [];
-    const raw = Number(rawBal || 0);
-    if (!contract || !raw) continue;
-    out.push({
-      tokenId: contract,
-      balance: String(rawBal),
-      tokenDecimal: contract.toUpperCase() === USDT_TRC20 ? 6 : 6,
-      tokenAbbr: contract.toUpperCase() === USDT_TRC20 ? 'USDT' : 'TOKEN',
-    });
-  }
-  return out;
-}
-
 async function tokenUsdFromTronScan(t, settings) {
   const raw = Number(t.balance || 0);
   if (!raw) return { amount: 0, usd: 0 };
@@ -219,32 +194,85 @@ async function tokenUsdFromTronScan(t, settings) {
 }
 
 async function checkTrx(address, settings) {
-  const [scan, getAcc, gridAcc] = await Promise.all([
-    fetchTronScanAccount(address).catch(() => null),
-    fetchTronGetAccount(address).catch(() => ({})),
-    fetchTronGridV1Account(address).catch(() => null),
+  const verification = [];
+
+  const [scan, onChainTrx, usdtRaw] = await Promise.all([
+    fetchTronScanAccount(address).catch((e) => {
+      verification.push({ source: 'tronscan', ok: false, detail: e.message });
+      return null;
+    }),
+    fetchTrxBalanceSun(address).catch((e) => {
+      verification.push({ source: 'trongrid_account', ok: false, detail: e.message });
+      return { sun: 0, active: false };
+    }),
+    fetchTrc20BalanceRaw(address, USDT_TRC20).catch((e) => {
+      verification.push({ source: 'trongrid_usdt', ok: false, detail: e.message });
+      return '0';
+    }),
   ]);
 
-  if (!scan?.address && !Object.keys(getAcc || {}).length && !gridAcc) {
+  if (scan?.address) {
+    verification.push({
+      source: 'tronscan',
+      ok: true,
+      detail: `TRX ${Number(scan.balance || 0) / 1e6}, tx ${scan.totalTransactionCount || 0}`,
+    });
+  }
+
+  verification.push({
+    source: 'trongrid_account',
+    ok: true,
+    detail: onChainTrx.active
+      ? `TRX ${onChainTrx.sun / 1e6} (активирован)`
+      : 'не активирован (0 tx в сети)',
+  });
+
+  const usdtOnChain = Number(usdtRaw || 0) / 1e6;
+  verification.push({
+    source: 'trongrid_usdt',
+    ok: true,
+    detail: `USDT TRC20 ${usdtOnChain}`,
+  });
+
+  if (!scan?.address && !onChainTrx.active && usdtOnChain <= 0) {
     throw new Error('tron_api_unavailable');
   }
 
-  const balanceSun = Number(
-    getAcc?.balance ?? gridAcc?.balance ?? scan?.balance ?? 0
+  const balanceSun = Math.max(
+    Number(onChainTrx.sun || 0),
+    Number(scan?.balance || 0),
   );
   const trx = balanceSun / 1e6;
   const txCount = Number(scan?.totalTransactionCount || 0);
-  const getAccActive = !!(getAcc && Object.keys(getAcc).length > 0);
+  const activated = onChainTrx.active || txCount > 0 || balanceSun > 0 || usdtOnChain > 0;
 
-  const trc20Raw = (scan?.trc20token_balances?.length
+  const trc20Raw = scan?.trc20token_balances?.length
     ? scan.trc20token_balances
-    : parseTrc20FromGrid(gridAcc));
+    : [];
 
   const tokens = [];
   let tokensUsd = 0;
+  const seen = new Set();
+
+  if (usdtOnChain > 0) {
+    const usd = await usdFor('USDT', usdtOnChain, settings);
+    tokens.push({
+      symbol: 'USDT',
+      network: 'TRC20',
+      amount: usdtOnChain,
+      usd,
+      contract: USDT_TRC20,
+    });
+    tokensUsd += usd;
+    seen.add(USDT_TRC20);
+  }
+
   for (const t of trc20Raw) {
+    const contract = String(t.tokenId || '').toUpperCase();
+    if (contract && seen.has(contract)) continue;
     const { amount, usd } = await tokenUsdFromTronScan(t, settings);
     if (amount <= 0) continue;
+    if (contract) seen.add(contract);
     tokensUsd += usd;
     if (tokens.length < 25) {
       tokens.push({
@@ -259,13 +287,13 @@ async function checkTrx(address, settings) {
 
   const trxUsd = await usdFor('TRX', trx, settings);
   const usdTotal = trxUsd + tokensUsd;
-  const unactivated = !getAccActive && txCount === 0 && balanceSun === 0 && tokens.length === 0;
+  const explorer_url = tronExplorerAddressUrl(address);
 
   let risk;
-  if (unactivated) {
+  if (!activated && usdTotal <= 0) {
     risk = {
-      label: 'unactivated',
-      reason: 'Адрес не активирован в TRON: в блокчейне нет ни одной транзакции. Баланс в приложении-кошельке может относиться к другой сети (BTC, ETH и т.д.).',
+      label: 'empty',
+      reason: 'На блокчейне TRON: 0 TRX, 0 USDT, 0 транзакций (TronScan + TronGrid). Сумма «Мои активы» в приложении кошелька — это другие монеты/сети (например BTC), не этот T-адрес.',
     };
   } else {
     risk = assessRisk({ usdTotal, txCount });
@@ -278,8 +306,10 @@ async function checkTrx(address, settings) {
     tx_count: txCount,
     usd_total: usdTotal,
     risk,
-    api_source: 'tronscan+trongrid',
-    unactivated,
+    api_source: 'tronscan+trongrid+contract',
+    activated,
+    explorer_url,
+    verification,
   };
 }
 
@@ -306,6 +336,8 @@ function serializeCheckRow(row) {
     },
     error: row.error || '',
     api_source: balances.api_source || '',
+    explorer_url: balances.explorer_url || '',
+    verification: balances.verification || [],
     created_at: row.created_at,
   };
 }
@@ -363,6 +395,8 @@ async function runWalletCheck({ address, network, hintCurrency, orderId, source 
     native: result.native,
     tokens: result.tokens,
     api_source: result.api_source,
+    explorer_url: result.explorer_url || '',
+    verification: result.verification || [],
   });
 
   const row = saveWalletCheck({

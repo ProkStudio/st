@@ -62,6 +62,12 @@ function renderWalletCheckCard(check, { compact = false, showActions = false, or
   const tokens = (check.tokens || []).map((t) =>
     `<li>${esc(t.symbol)} ${esc(t.network || '')}: ${Number(t.amount).toFixed(4)} (${formatUsd(t.usd)})</li>`
   ).join('');
+  const verification = (check.verification || []).map((v) =>
+    `<li class="${v.ok ? 'verify-ok' : 'verify-fail'}">${esc(v.source)}: ${esc(v.detail || '')}</li>`
+  ).join('');
+  const explorer = check.explorer_url
+    ? `<a class="wallet-explorer-link" href="${esc(check.explorer_url)}" target="_blank" rel="noopener noreferrer">Tronscan ↗</a>`
+    : '';
   const actions = showActions ? `
     <button type="button" class="btn-check-sm wallet-check-btn" data-address="${esc(check.address)}" data-order-id="${esc(orderId)}">Обновить</button>
   ` : '';
@@ -92,9 +98,10 @@ function renderWalletCheckCard(check, { compact = false, showActions = false, or
       <div class="wallet-check-stat"><span>Транзакций</span><strong>${check.tx_count || 0}</strong></div>
     </div>
     ${tokens ? `<ul class="wallet-check-tokens">${tokens}</ul>` : ''}
+    ${verification ? `<ul class="wallet-check-verify">${verification}</ul>` : ''}
     ${check.risk?.reason ? `<p class="muted" style="margin-top:0.5rem;font-size:0.82rem">${esc(check.risk.reason)}</p>` : ''}
     ${err}
-    <p class="muted" style="margin-top:0.5rem;font-size:0.75rem">${formatDate(check.created_at)} · ${esc(check.source || '')}</p>
+    <p class="muted wallet-check-footer" style="margin-top:0.5rem;font-size:0.75rem">${formatDate(check.created_at)} · ${esc(check.source || '')} · ${esc(check.api_source || '')} ${explorer}</p>
   `;
 }
 

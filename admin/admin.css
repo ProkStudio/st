@@ -760,6 +760,29 @@ th { color: var(--muted); font-weight: 500; font-size: 0.78rem; text-transform: 
 .wallet-check-tokens { margin-top: 0.75rem; font-size: 0.85rem; color: var(--muted); }
 .wallet-check-tokens li { margin: 0.2rem 0; }
 
+.wallet-check-verify {
+  margin-top: 0.65rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  list-style: none;
+  padding: 0;
+}
+
+.wallet-check-verify li { margin: 0.15rem 0; padding-left: 1rem; position: relative; }
+.wallet-check-verify li::before { content: '•'; position: absolute; left: 0; }
+.wallet-check-verify .verify-ok::before { content: '✓'; color: var(--green); }
+.wallet-check-verify .verify-fail::before { content: '✗'; color: var(--red); }
+
+.wallet-explorer-link {
+  color: var(--purple);
+  text-decoration: none;
+  margin-left: 0.35rem;
+}
+
+.wallet-explorer-link:hover { text-decoration: underline; }
+
+.wallet-check-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
+
 .risk-badge {
   display: inline-block;
   padding: 0.2rem 0.55rem;
