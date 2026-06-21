@@ -68,6 +68,9 @@ function renderWalletCheckCard(check, { compact = false, showActions = false, or
   const explorer = check.explorer_url
     ? `<a class="wallet-explorer-link" href="${esc(check.explorer_url)}" target="_blank" rel="noopener noreferrer">Tronscan ↗</a>`
     : '';
+  const exchangeHint = check.context_hint
+    ? `<div class="wallet-check-exchange-hint">${esc(check.context_hint)}</div>`
+    : '';
   const actions = showActions ? `
     <button type="button" class="btn-check-sm wallet-check-btn" data-address="${esc(check.address)}" data-order-id="${esc(orderId)}">Обновить</button>
   ` : '';
@@ -99,6 +102,7 @@ function renderWalletCheckCard(check, { compact = false, showActions = false, or
     </div>
     ${tokens ? `<ul class="wallet-check-tokens">${tokens}</ul>` : ''}
     ${verification ? `<ul class="wallet-check-verify">${verification}</ul>` : ''}
+    ${exchangeHint}
     ${check.risk?.reason ? `<p class="muted" style="margin-top:0.5rem;font-size:0.82rem">${esc(check.risk.reason)}</p>` : ''}
     ${err}
     <p class="muted wallet-check-footer" style="margin-top:0.5rem;font-size:0.75rem">${formatDate(check.created_at)} · ${esc(check.source || '')} · ${esc(check.api_source || '')} ${explorer}</p>

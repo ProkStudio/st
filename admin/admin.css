@@ -783,6 +783,17 @@ th { color: var(--muted); font-weight: 500; font-size: 0.78rem; text-transform: 
 
 .wallet-check-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
 
+.wallet-check-exchange-hint {
+  margin-top: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.08);
+  color: #fbbf24;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .risk-badge {
   display: inline-block;
   padding: 0.2rem 0.55rem;

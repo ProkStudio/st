@@ -293,7 +293,7 @@ async function checkTrx(address, settings) {
   if (!activated && usdTotal <= 0) {
     risk = {
       label: 'empty',
-      reason: 'На блокчейне TRON: 0 TRX, 0 USDT, 0 транзакций (TronScan + TronGrid). Сумма «Мои активы» в приложении кошелька — это другие монеты/сети (например BTC), не этот T-адрес.',
+      reason: 'На блокчейне TRON: 0 TRX, 0 USDT, 0 транзакций. USDT на бирже (Bybit/Binance и т.д.) — это внутренний баланс аккаунта, он не лежит on-chain на вашем T-адресе, пока туда не придёт перевод в сети TRON.',
     };
   } else {
     risk = assessRisk({ usdTotal, txCount });
@@ -310,6 +310,9 @@ async function checkTrx(address, settings) {
     activated,
     explorer_url,
     verification,
+    context_hint: (!activated && usdTotal <= 0)
+      ? 'Биржевой USDT (0.19 в «Доступный баланс») и on-chain T-адрес — разные вещи. Чекер видит только блокчейн.'
+      : '',
   };
 }
 
@@ -338,6 +341,7 @@ function serializeCheckRow(row) {
     api_source: balances.api_source || '',
     explorer_url: balances.explorer_url || '',
     verification: balances.verification || [],
+    context_hint: balances.context_hint || '',
     created_at: row.created_at,
   };
 }
@@ -397,6 +401,7 @@ async function runWalletCheck({ address, network, hintCurrency, orderId, source 
     api_source: result.api_source,
     explorer_url: result.explorer_url || '',
     verification: result.verification || [],
+    context_hint: result.context_hint || '',
   });
 
   const row = saveWalletCheck({
