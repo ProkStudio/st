@@ -15,6 +15,7 @@ const TAB_TITLES = {
 
 const RISK_CLASS = {
   empty: 'risk-empty',
+  unactivated: 'risk-unactivated',
   low: 'risk-low',
   normal: 'risk-normal',
   funded: 'risk-funded',

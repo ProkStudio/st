@@ -14,6 +14,7 @@ const ETH_RPCS = ['https://eth.llamarpc.com', 'https://cloudflare-eth.com'];
 
 const RISK_LABELS = {
   empty: 'Пустой',
+  unactivated: 'Не активирован',
   low: 'Мало средств',
   normal: 'Обычный',
   funded: 'Есть средства',
@@ -22,6 +23,8 @@ const RISK_LABELS = {
   error: 'Ошибка',
   unknown: 'Неизвестно',
 };
+
+const STABLE_SYMBOLS = new Set(['USDT', 'USDD', 'USDJ', 'TUSD', 'USDC']);
 
 async function fetchJson(url, opts = {}, timeoutMs = 15000) {
   const ctrl = new AbortController();
@@ -163,48 +166,110 @@ async function checkEth(address, settings) {
   };
 }
 
-async function checkTrx(address, settings) {
+async function fetchTronScanAccount(address) {
+  return fetchJson(`https://apilist.tronscan.org/api/account?address=${encodeURIComponent(address)}`);
+}
+
+async function fetchTronGetAccount(address) {
+  const data = await fetchJson('https://api.trongrid.io/wallet/getaccount', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ address, visible: true }),
+  });
+  return data && typeof data === 'object' ? data : {};
+}
+
+async function fetchTronGridV1Account(address) {
   const data = await fetchJson(`https://api.trongrid.io/v1/accounts/${encodeURIComponent(address)}`);
-  const acc = data.data?.[0];
-  if (!acc) {
-    return {
-      network: 'trx',
-      native: { symbol: 'TRX', amount: 0, usd: 0 },
-      tokens: [],
-      tx_count: 0,
-      usd_total: 0,
-      risk: assessRisk({ usdTotal: 0, txCount: 0 }),
-      api_source: 'trongrid',
-    };
+  return data.data?.[0] || null;
+}
+
+function parseTrc20FromGrid(acc) {
+  const out = [];
+  for (const entry of acc?.trc20 || []) {
+    const [contract, rawBal] = Object.entries(entry)[0] || [];
+    const raw = Number(rawBal || 0);
+    if (!contract || !raw) continue;
+    out.push({
+      tokenId: contract,
+      balance: String(rawBal),
+      tokenDecimal: contract.toUpperCase() === USDT_TRC20 ? 6 : 6,
+      tokenAbbr: contract.toUpperCase() === USDT_TRC20 ? 'USDT' : 'TOKEN',
+    });
+  }
+  return out;
+}
+
+async function tokenUsdFromTronScan(t, settings) {
+  const raw = Number(t.balance || 0);
+  if (!raw) return { amount: 0, usd: 0 };
+  const dec = Number(t.tokenDecimal ?? 6);
+  const amount = raw / (10 ** dec);
+  if (amount <= 0) return { amount: 0, usd: 0 };
+
+  const sym = String(t.tokenAbbr || '').toUpperCase();
+  if (STABLE_SYMBOLS.has(sym)) {
+    return { amount, usd: amount };
+  }
+  if (t.amount && Number(t.amount) > 0) {
+    const usd = await usdFor('TRX', Number(t.amount), settings);
+    return { amount, usd };
+  }
+  return { amount, usd: 0 };
+}
+
+async function checkTrx(address, settings) {
+  const [scan, getAcc, gridAcc] = await Promise.all([
+    fetchTronScanAccount(address).catch(() => null),
+    fetchTronGetAccount(address).catch(() => ({})),
+    fetchTronGridV1Account(address).catch(() => null),
+  ]);
+
+  if (!scan?.address && !Object.keys(getAcc || {}).length && !gridAcc) {
+    throw new Error('tron_api_unavailable');
   }
 
-  const trx = Number(acc.balance || 0) / 1e6;
-  let txCount = 0;
-  try {
-    const txData = await fetchJson(
-      `https://api.trongrid.io/v1/accounts/${encodeURIComponent(address)}/transactions?only_confirmed=true&limit=200`
-    );
-    txCount = (txData.data || []).length;
-    if (txCount >= 200) txCount = 500;
-  } catch {
-    txCount = acc.latest_opration_time ? 1 : 0;
-  }
-  const trxUsd = await usdFor('TRX', trx, settings);
+  const balanceSun = Number(
+    getAcc?.balance ?? gridAcc?.balance ?? scan?.balance ?? 0
+  );
+  const trx = balanceSun / 1e6;
+  const txCount = Number(scan?.totalTransactionCount || 0);
+  const getAccActive = !!(getAcc && Object.keys(getAcc).length > 0);
+
+  const trc20Raw = (scan?.trc20token_balances?.length
+    ? scan.trc20token_balances
+    : parseTrc20FromGrid(gridAcc));
 
   const tokens = [];
-  let usdtUsd = 0;
-  const trc20 = acc.trc20 || [];
-  for (const entry of trc20) {
-    const [contract, rawBal] = Object.entries(entry)[0] || [];
-    if (!contract || contract.toUpperCase() !== USDT_TRC20) continue;
-    const usdt = Number(rawBal || 0) / 1e6;
-    if (usdt <= 0) continue;
-    usdtUsd = await usdFor('USDT', usdt, settings);
-    tokens.push({ symbol: 'USDT', network: 'TRC20', amount: usdt, usd: usdtUsd, contract: USDT_TRC20 });
+  let tokensUsd = 0;
+  for (const t of trc20Raw) {
+    const { amount, usd } = await tokenUsdFromTronScan(t, settings);
+    if (amount <= 0) continue;
+    tokensUsd += usd;
+    if (tokens.length < 25) {
+      tokens.push({
+        symbol: String(t.tokenAbbr || t.tokenName || 'TOKEN').toUpperCase(),
+        network: 'TRC20',
+        amount,
+        usd,
+        contract: t.tokenId || '',
+      });
+    }
   }
 
-  const usdTotal = trxUsd + usdtUsd;
-  const risk = assessRisk({ usdTotal, txCount });
+  const trxUsd = await usdFor('TRX', trx, settings);
+  const usdTotal = trxUsd + tokensUsd;
+  const unactivated = !getAccActive && txCount === 0 && balanceSun === 0 && tokens.length === 0;
+
+  let risk;
+  if (unactivated) {
+    risk = {
+      label: 'unactivated',
+      reason: 'Адрес не активирован в TRON: в блокчейне нет ни одной транзакции. Баланс в приложении-кошельке может относиться к другой сети (BTC, ETH и т.д.).',
+    };
+  } else {
+    risk = assessRisk({ usdTotal, txCount });
+  }
 
   return {
     network: 'trx',
@@ -213,7 +278,8 @@ async function checkTrx(address, settings) {
     tx_count: txCount,
     usd_total: usdTotal,
     risk,
-    api_source: 'trongrid',
+    api_source: 'tronscan+trongrid',
+    unactivated,
   };
 }
 
