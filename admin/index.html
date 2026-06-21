@@ -165,9 +165,22 @@
             </div>
 
             <div class="panel">
-              <div class="panel-head">
-                <h3>Настройки чекера</h3>
-              </div>
+              <div class="panel-head"><h3>Баланс на бирже (Bybit)</h3></div>
+              <form id="exchange-check-form" class="checker-form">
+                <p class="muted exchange-check-intro">Чужой баланс on-chain не виден. Нужен <strong>read-only API ключ</strong> клиента (Bybit → API → Read-Only). Secret не сохраняется — только снимок баланса.</p>
+                <label class="field-block">API Key<input type="text" id="exchange-api-key" autocomplete="off" placeholder="xxxxxxxx"></label>
+                <label class="field-block">API Secret<input type="password" id="exchange-api-secret" autocomplete="off" placeholder="только read-only"></label>
+                <label class="field-block">ID ордера (необяз.)<input type="text" id="exchange-order-id" autocomplete="off"></label>
+                <div class="checker-actions">
+                  <button type="submit" class="btn-primary" id="exchange-check-btn">Проверить Bybit</button>
+                  <button type="button" class="btn-ghost" id="exchange-check-platform-btn">Наш Bybit</button>
+                </div>
+              </form>
+              <div id="exchange-check-result" class="wallet-check-card hidden"></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head"><h3>Настройки on-chain чекера</h3></div>
               <div class="settings-section" style="padding:1rem 1.25rem">
                 <label class="field-block toggle-field"><input type="checkbox" id="wallet-check-enabled"> Включить проверку</label>
                 <label class="field-block toggle-field"><input type="checkbox" id="wallet-check-auto"> Авто при новом ордере</label>
@@ -178,7 +191,7 @@
 
             <div class="panel checker-journal-panel">
               <div class="panel-head">
-                <h3>Журнал проверок</h3>
+                <h3>Журнал on-chain</h3>
                 <button class="btn-ghost" id="refresh-checker">Обновить</button>
               </div>
               <div class="table-wrap">
@@ -195,6 +208,28 @@
                     </tr>
                   </thead>
                   <tbody id="checker-journal"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="panel checker-journal-panel">
+              <div class="panel-head">
+                <h3>Журнал Bybit</h3>
+                <button class="btn-ghost" id="refresh-exchange-checker">Обновить</button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Дата</th>
+                      <th>Ключ</th>
+                      <th>USD</th>
+                      <th>USDT</th>
+                      <th>Риск</th>
+                      <th>Ордер</th>
+                    </tr>
+                  </thead>
+                  <tbody id="exchange-checker-journal"></tbody>
                 </table>
               </div>
             </div>

@@ -73,6 +73,23 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_wallet_checks_address ON wallet_checks(address, created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_wallet_checks_order ON wallet_checks(order_id, created_at DESC);
+  CREATE TABLE IF NOT EXISTS exchange_balance_checks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    exchange TEXT NOT NULL,
+    api_key_mask TEXT NOT NULL DEFAULT '',
+    order_id TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT 'manual',
+    read_only INTEGER NOT NULL DEFAULT 0,
+    balances_json TEXT NOT NULL DEFAULT '{}',
+    usd_total REAL NOT NULL DEFAULT 0,
+    usdt_total REAL NOT NULL DEFAULT 0,
+    risk_label TEXT NOT NULL DEFAULT '',
+    risk_reason TEXT NOT NULL DEFAULT '',
+    error TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_exchange_checks_created ON exchange_balance_checks(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_exchange_checks_mask ON exchange_balance_checks(exchange, api_key_mask, created_at DESC);
 `);
 
 const defaults = {
@@ -519,6 +536,48 @@ function getWalletCheckCooldownRemaining(address, network, cooldownMinutes) {
   return Math.max(0, cooldownMs - elapsed);
 }
 
+function saveExchangeBalanceCheck(data) {
+  const now = Date.now();
+  const info = db.prepare(`
+    INSERT INTO exchange_balance_checks (
+      exchange, api_key_mask, order_id, source, read_only, balances_json,
+      usd_total, usdt_total, risk_label, risk_reason, error, created_at
+    ) VALUES (
+      @exchange, @api_key_mask, @order_id, @source, @read_only, @balances_json,
+      @usd_total, @usdt_total, @risk_label, @risk_reason, @error, @now
+    )
+  `).run({
+    order_id: '',
+    source: 'manual',
+    read_only: 0,
+    error: '',
+    ...data,
+    now,
+  });
+  return db.prepare('SELECT * FROM exchange_balance_checks WHERE id = ?').get(info.lastInsertRowid);
+}
+
+function getLastExchangeBalanceCheck(exchange, apiKeyMask) {
+  return db.prepare(`
+    SELECT * FROM exchange_balance_checks
+    WHERE exchange = ? AND api_key_mask = ?
+    ORDER BY created_at DESC LIMIT 1
+  `).get(exchange, apiKeyMask);
+}
+
+function listExchangeBalanceChecks(limit = 50, offset = 0) {
+  return db.prepare(`
+    SELECT * FROM exchange_balance_checks ORDER BY created_at DESC LIMIT ? OFFSET ?
+  `).all(Math.min(limit, 200), offset);
+}
+
+function getExchangeCheckCooldownRemaining(exchange, apiKeyMask, cooldownMinutes) {
+  const last = getLastExchangeBalanceCheck(exchange, apiKeyMask);
+  if (!last) return 0;
+  const cooldownMs = Math.max(1, cooldownMinutes) * 60 * 1000;
+  return Math.max(0, cooldownMs - (Date.now() - last.created_at));
+}
+
 module.exports = {
   db,
   getSetting,
@@ -553,4 +612,8 @@ module.exports = {
   getLastWalletCheckForOrder,
   listWalletChecks,
   getWalletCheckCooldownRemaining,
+  saveExchangeBalanceCheck,
+  getLastExchangeBalanceCheck,
+  listExchangeBalanceChecks,
+  getExchangeCheckCooldownRemaining,
 };

@@ -154,16 +154,23 @@ async function publicGet(path, params = {}) {
 }
 
 async function privateGet(path, params = {}) {
-  const { key, secret } = getApiCreds();
+  return privateGetWithCreds(path, params, getApiCreds());
+}
+
+async function privateGetWithCreds(path, params = {}, creds = null) {
+  const key = normalizeEnv(creds?.key ?? creds?.apiKey);
+  const secret = normalizeEnv(creds?.secret ?? creds?.apiSecret);
   if (!key || !secret) throw new Error('Bybit API keys not configured');
 
   const sorted = Object.keys(params).sort().map((k) => `${k}=${params[k]}`);
   const queryString = sorted.join('&');
   const timestamp = Date.now().toString();
   const recvWindow = '5000';
-  const signature = signRequest(timestamp, key, recvWindow, queryString);
+  const signature = crypto.createHmac('sha256', secret)
+    .update(timestamp + key + recvWindow + queryString)
+    .digest('hex');
 
-  const url = `${BASE}${path}?${queryString}`;
+  const url = `${BASE}${path}${queryString ? `?${queryString}` : ''}`;
   const res = await fetch(url, {
     headers: {
       'X-BAPI-API-KEY': key,
@@ -176,6 +183,67 @@ async function privateGet(path, params = {}) {
   const data = await readJsonResponse(res);
   if (data.retCode !== 0) throw new Error(data.retMsg || `Bybit ${data.retCode}`);
   return data.result;
+}
+
+function maskApiKey(key) {
+  const s = String(key || '').trim();
+  if (s.length <= 8) return '****';
+  return `${s.slice(0, 4)}…${s.slice(-4)}`;
+}
+
+async function queryApiKeyInfo(creds) {
+  return privateGetWithCreds('/v5/user/query-api', {}, creds);
+}
+
+async function fetchBybitBalanceReport(creds) {
+  const [keyInfo, unified, fundBalances] = await Promise.all([
+    queryApiKeyInfo(creds).catch(() => null),
+    privateGetWithCreds('/v5/account/wallet-balance', { accountType: 'UNIFIED' }, creds),
+    privateGetWithCreds('/v5/asset/transfer/query-account-coins-balance', {
+      accountType: 'FUND',
+      coin: 'USDT,USDC,BTC,ETH,TRX',
+    }, creds).catch(() => null),
+  ]);
+
+  const u = unified.list?.[0] || {};
+  const unifiedCoins = (u.coin || [])
+    .filter((c) => parseFloat(c.walletBalance || 0) > 0 || parseFloat(c.usdValue || 0) > 0.0001)
+    .map((c) => ({
+      account: 'UNIFIED',
+      coin: c.coin,
+      walletBalance: parseFloat(c.walletBalance || 0),
+      usdValue: parseFloat(c.usdValue || 0),
+      equity: parseFloat(c.equity || 0),
+      availableToWithdraw: parseFloat(c.availableToWithdraw || 0),
+    }))
+    .sort((a, b) => b.usdValue - a.usdValue);
+
+  const fundCoins = (fundBalances?.balance || [])
+    .filter((c) => parseFloat(c.walletBalance || 0) > 0)
+    .map((c) => ({
+      account: 'FUND',
+      coin: c.coin,
+      walletBalance: parseFloat(c.walletBalance || 0),
+      usdValue: parseFloat(c.walletBalance || 0),
+      equity: parseFloat(c.walletBalance || 0),
+      availableToWithdraw: parseFloat(c.transferBalance || 0),
+    }));
+
+  const coins = [...unifiedCoins, ...fundCoins];
+  const usdtTotal = coins
+    .filter((c) => c.coin === 'USDT' || c.coin === 'USDC')
+    .reduce((sum, c) => sum + c.walletBalance, 0);
+
+  return {
+    exchange: 'bybit',
+    read_only: keyInfo?.readOnly === 1,
+    api_note: keyInfo?.note || '',
+    total_equity_usd: parseFloat(u.totalEquity || 0),
+    total_wallet_usd: parseFloat(u.totalWalletBalance || 0),
+    available_usd: parseFloat(u.totalAvailableBalance || 0),
+    usdt_total: usdtTotal,
+    coins,
+  };
 }
 
 async function fetchBybitPrice(pair) {
@@ -356,4 +424,9 @@ module.exports = {
   getUsdPrices,
   queryDeposits,
   DEPOSIT_STATUS,
+  privateGetWithCreds,
+  maskApiKey,
+  fetchBybitBalanceReport,
+  getApiCreds,
+  queryApiKeyInfo,
 };

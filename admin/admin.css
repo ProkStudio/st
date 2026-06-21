@@ -714,6 +714,7 @@ th { color: var(--muted); font-weight: 500; font-size: 0.78rem; text-transform: 
   gap: 1rem;
 }
 
+.exchange-check-intro { padding: 0 1.25rem 0.5rem; font-size: 0.82rem; line-height: 1.45; }
 .checker-form { padding: 0 1.25rem 1rem; }
 .checker-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
 

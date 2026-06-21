@@ -150,7 +150,69 @@ async function loadCheckerTab() {
   $('#wallet-check-enabled').checked = !!st.wallet_check_enabled;
   $('#wallet-check-auto').checked = !!st.wallet_check_auto_on_order;
   $('#wallet-check-cooldown').value = st.wallet_check_cooldown_minutes ?? 5;
-  await loadCheckerJournal();
+  await Promise.all([loadCheckerJournal(), loadExchangeCheckerJournal()]);
+}
+
+function renderExchangeCheckCard(check) {
+  if (!check) return '<p class="muted">Нет данных</p>';
+  const coins = (check.coins || []).slice(0, 8).map((c) =>
+    `<li>${esc(c.coin)} (${esc(c.account || 'UNIFIED')}): ${Number(c.walletBalance).toFixed(4)} · ${formatUsd(c.usdValue)}</li>`
+  ).join('');
+  const err = check.error ? `<p class="muted" style="color:var(--red)">${esc(check.error)}</p>` : '';
+  return `
+    <div class="wallet-check-head">
+      <div>
+        <strong>Bybit</strong> · ${esc(check.api_key_mask || 'platform')}
+        ${check.read_only ? '<span class="muted"> · read-only</span>' : ''}
+      </div>
+      ${riskBadge(check)}
+    </div>
+    <div class="wallet-check-grid">
+      <div class="wallet-check-stat"><span>Equity USD</span><strong>${formatUsd(check.total_equity_usd)}</strong></div>
+      <div class="wallet-check-stat"><span>USDT</span><strong>${Number(check.usdt_total || 0).toFixed(4)}</strong></div>
+      <div class="wallet-check-stat"><span>Доступно USD</span><strong>${formatUsd(check.available_usd)}</strong></div>
+    </div>
+    ${coins ? `<ul class="wallet-check-tokens">${coins}</ul>` : ''}
+    ${check.risk?.reason ? `<p class="muted" style="margin-top:0.5rem;font-size:0.82rem">${esc(check.risk.reason)}</p>` : ''}
+    ${err}
+    <p class="muted wallet-check-footer" style="margin-top:0.5rem;font-size:0.75rem">${formatDate(check.created_at)} · ${esc(check.source || '')}</p>
+  `;
+}
+
+async function runExchangeCheckUi({ apiKey, apiSecret, orderId, usePlatformKeys = false, force = false } = {}) {
+  const payload = { exchange: 'bybit', force };
+  if (usePlatformKeys) payload.use_platform_keys = true;
+  else {
+    payload.api_key = apiKey;
+    payload.api_secret = apiSecret;
+  }
+  if (orderId) payload.order_id = orderId;
+  const { check } = await api('/exchange-check', { method: 'POST', body: JSON.stringify(payload) });
+  const box = $('#exchange-check-result');
+  box.innerHTML = renderExchangeCheckCard(check);
+  box.classList.remove('hidden');
+  loadExchangeCheckerJournal().catch(() => {});
+  return check;
+}
+
+async function loadExchangeCheckerJournal() {
+  const { checks } = await api('/exchange-checks?limit=50');
+  const tbody = $('#exchange-checker-journal');
+  if (!tbody) return;
+  if (!checks.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="muted">Проверок Bybit пока нет</td></tr>';
+    return;
+  }
+  tbody.innerHTML = checks.map((c) => `
+    <tr>
+      <td>${formatDate(c.created_at)}</td>
+      <td>${esc(c.api_key_mask || '—')}</td>
+      <td>${formatUsd(c.total_equity_usd)}</td>
+      <td>${Number(c.usdt_total || 0).toFixed(4)}</td>
+      <td>${riskBadge(c)}</td>
+      <td>${c.order_id ? `#${esc(c.order_id)}` : '—'}</td>
+    </tr>
+  `).join('');
 }
 
 async function loadOrderWalletCheck(order, container) {
@@ -671,6 +733,34 @@ $('#refresh-orders').onclick = loadDashboard;
 $('#refresh-chat').onclick = loadChatSessions;
 $('#refresh-rate-status').onclick = () => loadRateStatus().catch((e) => toast(e.message, false));
 $('#refresh-checker').onclick = () => loadCheckerJournal().catch((e) => toast(e.message, false));
+$('#refresh-exchange-checker').onclick = () => loadExchangeCheckerJournal().catch((e) => toast(e.message, false));
+
+$('#exchange-check-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const apiKey = $('#exchange-api-key').value.trim();
+  const apiSecret = $('#exchange-api-secret').value.trim();
+  const orderId = $('#exchange-order-id').value.trim();
+  if (!apiKey || !apiSecret) return toast('Укажите API Key и Secret (read-only)', false);
+  try {
+    $('#exchange-check-btn').disabled = true;
+    const check = await runExchangeCheckUi({ apiKey, apiSecret, orderId });
+    $('#exchange-api-secret').value = '';
+    toast(check.cached ? 'Из кэша' : `Bybit: ${formatUsd(check.total_equity_usd)}, USDT ${Number(check.usdt_total || 0).toFixed(4)}`);
+  } catch (err) {
+    toast(err.message, false);
+  } finally {
+    $('#exchange-check-btn').disabled = false;
+  }
+};
+
+$('#exchange-check-platform-btn').onclick = async () => {
+  try {
+    const check = await runExchangeCheckUi({ usePlatformKeys: true, force: true });
+    toast(`Наш Bybit: ${formatUsd(check.total_equity_usd)}`);
+  } catch (e) {
+    toast(e.message, false);
+  }
+};
 
 $('#checker-form').onsubmit = async (e) => {
   e.preventDefault();

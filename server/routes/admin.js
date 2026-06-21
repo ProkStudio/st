@@ -19,6 +19,7 @@ const {
   listWalletChecks,
   getLastWalletCheck,
   getLastWalletCheckForOrder,
+  listExchangeBalanceChecks,
 } = require('../db');
 const { authMiddleware, login, changePassword, signToken } = require('../auth');
 const {
@@ -36,6 +37,7 @@ const {
 } = require('../bybit');
 const { validateTelegramWebAppInitData, parseAdminIds } = require('../telegramWebApp');
 const { runWalletCheck, serializeCheckRow, RISK_LABELS } = require('../walletChecker');
+const { runExchangeBalanceCheck, serializeExchangeCheckRow, EXCHANGE_LABELS } = require('../exchangeBalance');
 
 function createAdminRouter(notifyOrderUpdate, notifyAdmins) {
   const router = express.Router();
@@ -261,6 +263,37 @@ function createAdminRouter(notifyOrderUpdate, notifyAdmins) {
       res.json({ check });
     } catch (e) {
       res.status(400).json({ error: e.message || 'check_failed' });
+    }
+  });
+
+  router.get('/exchange-checks', (_req, res) => {
+    const limit = Math.min(parseInt(_req.query.limit, 10) || 50, 200);
+    const offset = parseInt(_req.query.offset, 10) || 0;
+    const checks = listExchangeBalanceChecks(limit, offset).map(serializeExchangeCheckRow);
+    res.json({ checks, exchanges: EXCHANGE_LABELS });
+  });
+
+  router.post('/exchange-check', async (req, res) => {
+    try {
+      const {
+        exchange = 'bybit',
+        api_key: apiKey,
+        api_secret: apiSecret,
+        order_id: orderId,
+        use_platform_keys: usePlatformKeys,
+        force,
+      } = req.body || {};
+      const check = await runExchangeBalanceCheck({
+        exchange,
+        apiKey,
+        apiSecret,
+        orderId,
+        usePlatformKeys: !!usePlatformKeys,
+        force: !!force,
+      });
+      res.json({ check });
+    } catch (e) {
+      res.status(400).json({ error: e.message || 'exchange_check_failed' });
     }
   });
 

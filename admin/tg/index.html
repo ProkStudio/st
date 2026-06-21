@@ -59,6 +59,15 @@
         </div>
         <div id="tg-checker-result" class="card hidden"></div>
         <div class="card">
+          <h2>Bybit (баланс аккаунта)</h2>
+          <p class="hint">Нужен read-only API ключ клиента. Secret не сохраняется.</p>
+          <label class="field">API Key<input type="text" id="tg-exchange-key" autocomplete="off"></label>
+          <label class="field">API Secret<input type="password" id="tg-exchange-secret" autocomplete="off"></label>
+          <button type="button" class="btn-primary btn-block" id="tg-exchange-run">Проверить Bybit</button>
+          <button type="button" class="btn-secondary btn-block" id="tg-exchange-platform">Наш Bybit</button>
+        </div>
+        <div id="tg-exchange-result" class="card hidden"></div>
+        <div class="card">
           <div class="card-head"><h2>Журнал</h2></div>
           <div id="tg-checker-journal" class="stack-list"></div>
         </div>

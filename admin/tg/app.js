@@ -73,6 +73,30 @@ async function loadCheckerTg() {
   await loadCheckerJournalTg();
 }
 
+async function runTgExchangeCheck({ apiKey, apiSecret, usePlatformKeys = false } = {}) {
+  const payload = { exchange: 'bybit', force: true };
+  if (usePlatformKeys) payload.use_platform_keys = true;
+  else {
+    payload.api_key = apiKey;
+    payload.api_secret = apiSecret;
+  }
+  const { check } = await api('/exchange-check', { method: 'POST', body: JSON.stringify(payload) });
+  return check;
+}
+
+function renderTgExchangeCard(check) {
+  if (!check) return '<p class="empty">Нет данных</p>';
+  const coins = (check.coins || []).slice(0, 5).map((c) =>
+    `<div class="hint">${esc(c.coin)}: ${Number(c.walletBalance).toFixed(4)}</div>`
+  ).join('');
+  return `
+    <div class="check-card-top">${riskBadgeTg(check)}<strong>${formatUsd(check.total_equity_usd)}</strong></div>
+    <div>USDT: ${Number(check.usdt_total || 0).toFixed(4)}</div>
+    ${coins}
+    ${check.error ? `<div class="hint" style="color:var(--red)">${esc(check.error)}</div>` : ''}
+  `;
+}
+
 async function runTgWalletCheck({ address, network, orderId, force = false }) {
   const payload = { address, force };
   if (network) payload.network = network;
@@ -623,6 +647,34 @@ $('#btn-refresh').addEventListener('click', () => {
 $('#btn-rate-check').addEventListener('click', () => {
   haptic('light');
   loadRateStatus().catch((e) => toast(e.message, false));
+});
+
+$('#tg-exchange-run').addEventListener('click', async () => {
+  const apiKey = $('#tg-exchange-key').value.trim();
+  const apiSecret = $('#tg-exchange-secret').value.trim();
+  if (!apiKey || !apiSecret) return toast('API Key + Secret', false);
+  try {
+    haptic('medium');
+    const check = await runTgExchangeCheck({ apiKey, apiSecret });
+    $('#tg-exchange-result').innerHTML = renderTgExchangeCard(check);
+    $('#tg-exchange-result').classList.remove('hidden');
+    $('#tg-exchange-secret').value = '';
+    tg?.showAlert?.(`Bybit: ${formatUsd(check.total_equity_usd)}\nUSDT: ${Number(check.usdt_total || 0).toFixed(4)}`);
+  } catch (e) {
+    toast(e.message, false);
+    tg?.showAlert?.(e.message);
+  }
+});
+
+$('#tg-exchange-platform').addEventListener('click', async () => {
+  try {
+    haptic('light');
+    const check = await runTgExchangeCheck({ usePlatformKeys: true });
+    $('#tg-exchange-result').innerHTML = renderTgExchangeCard(check);
+    $('#tg-exchange-result').classList.remove('hidden');
+  } catch (e) {
+    tg?.showAlert?.(e.message);
+  }
 });
 
 $('#tg-checker-run').addEventListener('click', async () => {
